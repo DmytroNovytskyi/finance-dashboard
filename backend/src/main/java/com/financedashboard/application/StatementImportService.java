@@ -6,19 +6,24 @@ import com.financedashboard.domain.exception.UnsupportedStatementException;
 import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementParser;
 import com.financedashboard.domain.port.BankStatementRepository;
+import com.financedashboard.domain.port.FxRateProvider;
 import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.domain.statement.ParsedStatement;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionNature;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,6 +39,10 @@ public class StatementImportService {
     private final BankStatementRepository statements;
     private final TransactionRepository transactions;
     private final AccountRepository accounts;
+    private final FxRateProvider fxRates;
+
+    @Value("${finance.base-currency:PLN}")
+    private String baseCurrency;
 
     /** Outcome of importing a statement. */
     public record StatementImportResult(
@@ -70,17 +79,7 @@ public class StatementImportService {
                 .build());
 
         List<Transaction> rows = parsed.transactions().stream()
-                .map(tx -> Transaction.builder()
-                        .statementId(saved.getId())
-                        .accountId(accountId)
-                        .transactionDate(tx.date())
-                        .amount(tx.amount())
-                        .currency(parsed.currency())
-                        .nature(TransactionNature.forSignedAmount(tx.amount()))
-                        .description(tx.description())
-                        .merchant(tx.merchant())
-                        .dedupHash(dedupHash(tx.date(), tx.amount(), parsed.currency(), tx.description()))
-                        .build())
+                .map(tx -> toTransaction(tx, parsed.currency(), saved.getId(), accountId))
                 .toList();
 
         Set<String> existing = transactions.findExistingDedupHashes(accountId,
@@ -91,6 +90,37 @@ public class StatementImportService {
         transactions.saveAll(fresh);
 
         return new StatementImportResult(saved.getId(), false, fresh.size(), rows.size() - fresh.size());
+    }
+
+    private Transaction toTransaction(com.financedashboard.domain.statement.ParsedTransaction tx,
+                                      String currency, Long statementId, Long accountId) {
+        BigDecimal baseAmount = null;
+        BigDecimal fxRate = null;
+        LocalDate fxRateDate = null;
+        if (currency.equalsIgnoreCase(baseCurrency)) {
+            baseAmount = tx.amount();
+        } else {
+            Optional<FxRateProvider.FxRate> rate = fxRates.findRate(currency, tx.date());
+            if (rate.isPresent()) {
+                fxRate = rate.get().rate();
+                fxRateDate = rate.get().date();
+                baseAmount = tx.amount().multiply(fxRate).setScale(4, RoundingMode.HALF_UP);
+            }
+        }
+        return Transaction.builder()
+                .statementId(statementId)
+                .accountId(accountId)
+                .transactionDate(tx.date())
+                .amount(tx.amount())
+                .currency(currency)
+                .nature(TransactionNature.forSignedAmount(tx.amount()))
+                .description(tx.description())
+                .merchant(tx.merchant())
+                .baseAmount(baseAmount)
+                .fxRate(fxRate)
+                .fxRateDate(fxRateDate)
+                .dedupHash(dedupHash(tx.date(), tx.amount(), currency, tx.description()))
+                .build();
     }
 
     private BankStatementParser selectParser(byte[] file, String mediaType) {

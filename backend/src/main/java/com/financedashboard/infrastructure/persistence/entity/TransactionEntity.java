@@ -60,6 +60,15 @@ public class TransactionEntity {
     @Column(name = "dedup_hash")
     private String dedupHash;
 
+    @Column(name = "base_amount", precision = 19, scale = 4)
+    private BigDecimal baseAmount;
+
+    @Column(name = "fx_rate", precision = 20, scale = 8)
+    private BigDecimal fxRate;
+
+    @Column(name = "fx_rate_date")
+    private LocalDate fxRateDate;
+
     @Column(name = "transfer_group_id")
     private UUID transferGroupId;
 

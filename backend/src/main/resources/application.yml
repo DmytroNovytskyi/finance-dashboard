@@ -27,3 +27,6 @@ springdoc:
 
 finance:
   base-currency: ${FINANCE_BASE_CURRENCY:PLN}
+  fx:
+    nbp:
+      base-url: ${NBP_BASE_URL:https://api.nbp.pl}

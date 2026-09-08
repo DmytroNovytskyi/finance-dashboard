@@ -35,6 +35,20 @@ public final class PekaoTestPdf {
                 "Suma obrotów -83,75 1200,50"));
     }
 
+    /** A synthetic USD-denominated statement with 2 transactions (debits -50,00, credits 80,00). */
+    public static byte[] usdStatement() {
+        return render(List.of(
+                "Bank Pekao S.A.",
+                "Za okres od 01/03/2026 do 25/03/2026",
+                "KONTO PRZEKORZYSTNE 99 0000 1111 2222 3333 4444 5555 USD",
+                "Data waluty Kwota Opis operacji",
+                "02/03/2026 -50,00 CLOUD HOSTING",
+                "HOSTING CO",
+                "10/03/2026 80,00 CLIENT PAYMENT",
+                "ACME CLIENT",
+                "Suma obrotów -50,00 80,00"));
+    }
+
     private static byte[] render(List<String> lines) {
         try (PDDocument document = new PDDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
