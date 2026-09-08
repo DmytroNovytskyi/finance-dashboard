@@ -45,3 +45,8 @@ Strategy (parsers), Registry/Factory (parser selection), Chain of Responsibility
 
 Base path `/api/v1`, JSON, OpenAPI via springdoc at `/swagger-ui.html`. Endpoints are
 listed in the plan's REST table; see `web/controller` for the authoritative list.
+
+Accounts carry a user-managed `kind` (`PERSONAL` / `BUSINESS`, set via
+`PATCH /api/v1/accounts/{id}`) that drives the statistics personal-vs-business split.
+`nature=TRANSFER` rows (incl. auto-detected internal transfers between the user's own accounts)
+are excluded from every statistic.
