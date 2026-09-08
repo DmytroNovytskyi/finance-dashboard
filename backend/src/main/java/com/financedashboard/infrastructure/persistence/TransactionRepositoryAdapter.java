@@ -79,6 +79,27 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public List<Transaction> findNonTransfers(LocalDate from, LocalDate to, Collection<Long> accountIds) {
+        Specification<TransactionEntity> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.notEqual(root.get("nature"), TransactionNature.TRANSFER));
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("transactionDate"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("transactionDate"), to));
+            }
+            if (accountIds != null) {
+                predicates.add(root.get("accountId").in(accountIds));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        List<TransactionEntity> entities = jpa.findAll(spec,
+                Sort.by(Sort.Order.asc("transactionDate"), Sort.Order.asc("id")));
+        return mapper.toDomain(entities);
+    }
+
+    @Override
     public List<Transaction> findByTransferGroupIds(Collection<UUID> transferGroupIds) {
         return mapper.toDomain(jpa.findByTransferGroupIdIn(transferGroupIds));
     }

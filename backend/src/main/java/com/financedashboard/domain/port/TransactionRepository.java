@@ -28,6 +28,13 @@ public interface TransactionRepository {
     /** Returns transactions whose value date is within the inclusive range, optionally for one account. */
     List<Transaction> findByDateRangeAndAccount(LocalDate from, LocalDate to, Long accountId);
 
+    /**
+     * Returns non-transfer transactions with a transaction date within the inclusive range (bounds
+     * optional), restricted to the given accounts, oldest first. {@code null} bounds or accountIds
+     * mean no restriction. Used by statistics.
+     */
+    List<Transaction> findNonTransfers(LocalDate from, LocalDate to, Collection<Long> accountIds);
+
     /** Returns transactions belonging to any of the given transfer groups. */
     List<Transaction> findByTransferGroupIds(Collection<UUID> transferGroupIds);
 

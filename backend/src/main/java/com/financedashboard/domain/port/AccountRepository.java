@@ -1,6 +1,7 @@
 package com.financedashboard.domain.port;
 
 import com.financedashboard.domain.account.Account;
+import com.financedashboard.domain.account.AccountKind;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,9 @@ public interface AccountRepository {
 
     /** Returns all accounts ordered by sort order then name. */
     List<Account> findAll();
+
+    /** Returns accounts tagged with the given kind, ordered by sort order then name. */
+    List<Account> findByKind(AccountKind kind);
 
     /** Returns whether an account with the given id exists. */
     boolean existsById(Long id);

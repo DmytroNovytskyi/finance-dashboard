@@ -1,6 +1,7 @@
 package com.financedashboard.infrastructure.persistence;
 
 import com.financedashboard.domain.account.Account;
+import com.financedashboard.domain.account.AccountKind;
 import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.infrastructure.persistence.mapper.AccountMapper;
 import java.util.List;
@@ -29,6 +30,11 @@ public class AccountRepositoryAdapter implements AccountRepository {
     @Override
     public List<Account> findAll() {
         return mapper.toDomain(jpa.findAllByOrderBySortOrderAscNameAsc());
+    }
+
+    @Override
+    public List<Account> findByKind(AccountKind kind) {
+        return mapper.toDomain(jpa.findByKindOrderBySortOrderAscNameAsc(kind));
     }
 
     @Override

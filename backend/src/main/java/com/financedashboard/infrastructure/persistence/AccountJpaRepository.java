@@ -1,5 +1,6 @@
 package com.financedashboard.infrastructure.persistence;
 
+import com.financedashboard.domain.account.AccountKind;
 import com.financedashboard.infrastructure.persistence.entity.AccountEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,4 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AccountJpaRepository extends JpaRepository<AccountEntity, Long> {
 
     List<AccountEntity> findAllByOrderBySortOrderAscNameAsc();
+
+    List<AccountEntity> findByKindOrderBySortOrderAscNameAsc(AccountKind kind);
 }

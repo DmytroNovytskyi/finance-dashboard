@@ -50,3 +50,11 @@ Accounts carry a user-managed `kind` (`PERSONAL` / `BUSINESS`, set via
 `PATCH /api/v1/accounts/{id}`) that drives the statistics personal-vs-business split.
 `nature=TRANSFER` rows (incl. auto-detected internal transfers between the user's own accounts)
 are excluded from every statistic.
+
+Statistics: `GET /api/v1/statistics/summary?from&to[&accountId|kind][&topN]` reports period totals
+(income, expense magnitude, net = income − expense, transaction count, uncategorized count,
+average daily expense) plus the same split by month, by category (uncategorized bucketed as
+`(uncategorized)`), and top merchants. Amounts are summed in the base currency from `base_amount`;
+rows lacking a base amount (foreign currency without an import-time rate) are counted in an
+`unconverted` field rather than the money buckets. `kind` restricts to accounts tagged
+`PERSONAL`/`BUSINESS` (the informal business profit/loss view).
