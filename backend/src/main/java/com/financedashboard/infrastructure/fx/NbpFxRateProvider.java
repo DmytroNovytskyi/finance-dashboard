@@ -33,26 +33,30 @@ public class NbpFxRateProvider implements FxRateProvider {
         if (code.equals(base)) {
             return Optional.of(new FxRate(BigDecimal.ONE, date));
         }
-        return store.findByCurrencyAndRateDateAndBaseCurrency(code, date, base)
-                .map(entity -> new FxRate(entity.getRate(), entity.getRateDate()))
-                .or(() -> fetchAndStore(code, date, base));
-    }
-
-    private Optional<FxRate> fetchAndStore(String code, LocalDate date, String base) {
         for (int back = 0; back <= MAX_LOOKBACK_DAYS; back++) {
             LocalDate day = date.minusDays(back);
+            Optional<FxRate> cached = store
+                    .findByCurrencyAndRateDateAndBaseCurrency(code, day, base)
+                    .map(entity -> new FxRate(entity.getRate(), entity.getRateDate()));
+            if (cached.isPresent()) {
+                return cached;
+            }
             Optional<BigDecimal> mid = client.midRate(code, day);
             if (mid.isPresent()) {
-                FxRateEntity entity = new FxRateEntity();
-                entity.setCurrency(code);
-                entity.setRateDate(day);
-                entity.setRate(mid.get());
-                entity.setBaseCurrency(base);
-                entity.setSource("NBP");
-                store.save(entity);
+                store.save(newEntity(code, day, mid.get(), base));
                 return Optional.of(new FxRate(mid.get(), day));
             }
         }
         return Optional.empty();
+    }
+
+    private static FxRateEntity newEntity(String code, LocalDate day, BigDecimal mid, String base) {
+        FxRateEntity entity = new FxRateEntity();
+        entity.setCurrency(code);
+        entity.setRateDate(day);
+        entity.setRate(mid);
+        entity.setBaseCurrency(base);
+        entity.setSource("NBP");
+        return entity;
     }
 }

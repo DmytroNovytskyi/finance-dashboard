@@ -100,7 +100,12 @@ public class StatementImportService {
         if (currency.equalsIgnoreCase(baseCurrency)) {
             baseAmount = tx.amount();
         } else {
-            Optional<FxRateProvider.FxRate> rate = fxRates.findRate(currency, tx.date());
+            Optional<FxRateProvider.FxRate> rate;
+            try {
+                rate = fxRates.findRate(currency, tx.date());
+            } catch (RuntimeException e) {
+                rate = Optional.empty(); // rate source unavailable: store without conversion
+            }
             if (rate.isPresent()) {
                 fxRate = rate.get().rate();
                 fxRateDate = rate.get().date();

@@ -48,4 +48,5 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'finance.history-loader', System.getProperty('finance.history-loader', 'false')
 }
