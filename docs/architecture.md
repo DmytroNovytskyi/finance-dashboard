@@ -1,6 +1,6 @@
 # Architecture
 
-Three services: **PostgreSQL 16** (persistence), **backend** (Spring Boot 3 / Java 21,
+Three services: **PostgreSQL 18** (persistence), **backend** (Spring Boot 3 / Java 21,
 Gradle), and **frontend** (Vite + React + TS, built to static assets and served by nginx).
 The frontend proxies `/api` to the backend in production; in development Vite does the same.
 

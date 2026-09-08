@@ -18,7 +18,7 @@ money goes.
                     └──────────────┬──────────────┘
                                    │
                     ┌──────────────▼──────────────┐
-                    │  PostgreSQL 16              │
+                    │  PostgreSQL 18              │
                     │  data/  (bind mount)        │
                     └─────────────────────────────┘
 ```
@@ -35,7 +35,7 @@ money goes.
 | Backend   | Java 21, Spring Boot 3, Gradle      |
 | Persistence | Spring Data JPA, Flyway migrations |
 | Frontend  | Vite + React + TypeScript, MUI      |
-| Database  | PostgreSQL 16                       |
+| Database  | PostgreSQL 18                       |
 | FX rates  | NBP (api.nbp.pl), DB-first          |
 
 ## Prerequisites

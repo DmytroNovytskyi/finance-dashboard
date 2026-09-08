@@ -10,7 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Base for API integration tests: boots the full application against the {@code test} profile
- * datasource (a Postgres 16 container on localhost) and resets the tables before each test.
+ * datasource (a Postgres 18 container on localhost) and resets the tables before each test.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

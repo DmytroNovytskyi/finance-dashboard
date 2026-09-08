@@ -33,7 +33,7 @@ docker compose up -d
 
 ## Services
 
-- `db` — `postgres:16`, healthchecked, data at `./data` (bind mount).
+- `db` — `postgres:18`, healthchecked, data at `./data` (bind mount).
 - `backend` — built from `./app/backend`, no published port (internal only), waits for a
   healthy db.
 - `frontend` — built from `./app/frontend`, published on `:8100` by default

@@ -4,7 +4,7 @@
 
 A personal expense dashboard: import bank statement files, parse them into a normalized
 transaction model, categorize spending, and view statistics. Backend is Java 21 +
-Spring Boot 3 (Gradle), frontend is Vite + React + TypeScript (MUI), DB is PostgreSQL 16.
+Spring Boot 3 (Gradle), frontend is Vite + React + TypeScript (MUI), DB is PostgreSQL 18.
 `docs/` is the source of architecture truth — keep it current when the system changes.
 
 ## Build / run / test
