@@ -2,6 +2,7 @@ package com.financedashboard.domain.transaction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,4 +24,5 @@ public class Transaction {
     private final String merchant;
     private final Long categoryId;
     private final String dedupHash;
+    private final UUID transferGroupId;
 }

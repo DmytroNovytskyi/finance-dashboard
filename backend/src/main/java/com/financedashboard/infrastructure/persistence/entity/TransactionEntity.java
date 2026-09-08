@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -58,6 +59,9 @@ public class TransactionEntity {
 
     @Column(name = "dedup_hash")
     private String dedupHash;
+
+    @Column(name = "transfer_group_id")
+    private UUID transferGroupId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

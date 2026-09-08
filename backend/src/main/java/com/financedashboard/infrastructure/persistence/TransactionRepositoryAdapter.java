@@ -11,12 +11,14 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -58,6 +60,37 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
         return jpa.findByAccountIdAndDedupHashIn(accountId, hashes).stream()
                 .map(TransactionEntity::getDedupHash)
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public List<Transaction> findByDateRangeAndAccount(LocalDate from, LocalDate to, Long accountId) {
+        Specification<TransactionEntity> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.between(root.get("transactionDate"), from, to));
+            if (accountId != null) {
+                predicates.add(cb.equal(root.get("accountId"), accountId));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        List<TransactionEntity> entities = jpa.findAll(spec,
+                Sort.by(Sort.Order.asc("transactionDate"), Sort.Order.asc("id")));
+        return mapper.toDomain(entities);
+    }
+
+    @Override
+    public List<Transaction> findByTransferGroupIds(Collection<UUID> transferGroupIds) {
+        return mapper.toDomain(jpa.findByTransferGroupIdIn(transferGroupIds));
+    }
+
+    @Override
+    public boolean existsByStatementId(Long statementId) {
+        return jpa.existsByStatementId(statementId);
+    }
+
+    @Override
+    public void deleteAll(Collection<Transaction> transactions) {
+        List<Long> ids = transactions.stream().map(Transaction::getId).toList();
+        jpa.deleteAllByIdInBatch(ids);
     }
 
     @Override

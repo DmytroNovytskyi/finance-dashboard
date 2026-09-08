@@ -29,4 +29,9 @@ public class BankStatementRepositoryAdapter implements BankStatementRepository {
     public boolean existsByFileHash(String fileHash) {
         return jpa.existsByFileHash(fileHash);
     }
+
+    @Override
+    public void deleteById(Long id) {
+        jpa.deleteById(id);
+    }
 }

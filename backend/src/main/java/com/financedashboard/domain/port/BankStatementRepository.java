@@ -14,4 +14,7 @@ public interface BankStatementRepository {
 
     /** Returns whether a statement with the given file hash was already imported. */
     boolean existsByFileHash(String fileHash);
+
+    /** Deletes the statement with the given id. */
+    void deleteById(Long id);
 }
