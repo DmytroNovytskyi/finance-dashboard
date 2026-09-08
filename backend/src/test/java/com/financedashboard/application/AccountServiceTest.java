@@ -1,0 +1,81 @@
+package com.financedashboard.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.financedashboard.application.exception.NotFoundException;
+import com.financedashboard.domain.account.Account;
+import com.financedashboard.domain.account.AccountKind;
+import com.financedashboard.domain.port.AccountRepository;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class AccountServiceTest {
+
+    @Mock
+    private AccountRepository accounts;
+
+    @InjectMocks
+    private AccountService service;
+
+    @Test
+    void createNormalizesNameAndCurrency() {
+        when(accounts.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Account created = service.create("  Personal PLN ", "pln", AccountKind.PERSONAL, "123", null);
+
+        assertThat(created.getName()).isEqualTo("Personal PLN");
+        assertThat(created.getCurrency()).isEqualTo("PLN");
+        assertThat(created.getKind()).isEqualTo(AccountKind.PERSONAL);
+        assertThat(created.getAccountNumber()).isEqualTo("123");
+        assertThat(created.getSortOrder()).isZero();
+    }
+
+    @Test
+    void createRejectsBlankName() {
+        assertThatThrownBy(() -> service.create("   ", "PLN", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void createRejectsNonIsoCurrency() {
+        assertThatThrownBy(() -> service.create("Account", "PL", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void getThrowsWhenAccountMissing() {
+        when(accounts.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.get(1L)).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void updateAppliesProvidedFieldsAndKeepsOthers() {
+        Account existing = Account.builder()
+                .id(1L)
+                .name("Old")
+                .currency("PLN")
+                .accountNumber("x")
+                .sortOrder(0)
+                .build();
+        when(accounts.findById(1L)).thenReturn(Optional.of(existing));
+        when(accounts.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Account updated = service.update(1L, "New", null, AccountKind.BUSINESS, null);
+
+        assertThat(updated.getName()).isEqualTo("New");
+        assertThat(updated.getCurrency()).isEqualTo("PLN");
+        assertThat(updated.getKind()).isEqualTo(AccountKind.BUSINESS);
+        assertThat(updated.getAccountNumber()).isNull();
+        verify(accounts).save(any());
+    }
+}
