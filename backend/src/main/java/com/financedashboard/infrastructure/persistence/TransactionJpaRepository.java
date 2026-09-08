@@ -1,5 +1,6 @@
 package com.financedashboard.infrastructure.persistence;
 
+import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.infrastructure.persistence.entity.TransactionEntity;
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +15,8 @@ public interface TransactionJpaRepository
     List<TransactionEntity> findByAccountIdAndDedupHashIn(Long accountId, Collection<String> dedupHashes);
 
     List<TransactionEntity> findByTransferGroupIdIn(Collection<UUID> transferGroupIds);
+
+    List<TransactionEntity> findByNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
 
     boolean existsByStatementId(Long statementId);
 }

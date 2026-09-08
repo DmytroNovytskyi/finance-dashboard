@@ -37,6 +37,9 @@ public interface TransactionRepository {
     /** Deletes the given transactions. */
     void deleteAll(Collection<Transaction> transactions);
 
+    /** Returns all transactions that are not internal transfers, oldest first. */
+    List<Transaction> findAllNonTransfers();
+
     /**
      * Returns one page of transactions matching {@code filter}, ordered by transaction date
      * descending then id descending.

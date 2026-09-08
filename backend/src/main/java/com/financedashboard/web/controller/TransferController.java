@@ -1,14 +1,19 @@
 package com.financedashboard.web.controller;
 
 import com.financedashboard.application.TransactionEditService;
+import com.financedashboard.application.TransferSuggestionService;
+import com.financedashboard.application.TransferSuggestionService.SuggestedTransfer;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.web.dto.PairTransferRequest;
 import com.financedashboard.web.dto.TransactionResponse;
+import com.financedashboard.web.dto.TransferApplyResponse;
 import com.financedashboard.web.dto.TransferPairResponse;
+import com.financedashboard.web.dto.TransferSuggestionResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TransferController {
 
     private final TransactionEditService transfers;
+    private final TransferSuggestionService suggestions;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -32,5 +38,18 @@ public class TransferController {
                 legs.get(0).getTransferGroupId(),
                 TransactionResponse.from(legs.get(0)),
                 TransactionResponse.from(legs.get(1)));
+    }
+
+    /** Lists currently detected own-account transfer pairs that are not yet marked as transfers. */
+    @GetMapping("/suggestions")
+    public List<TransferSuggestionResponse> listSuggestions() {
+        return suggestions.suggest().stream().map(TransferSuggestionResponse::from).toList();
+    }
+
+    /** Applies all current suggestions (each pair becomes a TRANSFER). */
+    @PostMapping("/suggestions/apply")
+    public TransferApplyResponse applySuggestions() {
+        int applied = suggestions.apply(transfers);
+        return new TransferApplyResponse(applied);
     }
 }

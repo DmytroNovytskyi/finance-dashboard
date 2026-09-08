@@ -5,6 +5,7 @@ import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionFilter;
 import com.financedashboard.domain.transaction.TransactionNature;
+import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.infrastructure.persistence.entity.TransactionEntity;
 import com.financedashboard.infrastructure.persistence.mapper.TransactionMapper;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -91,6 +92,11 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     public void deleteAll(Collection<Transaction> transactions) {
         List<Long> ids = transactions.stream().map(Transaction::getId).toList();
         jpa.deleteAllByIdInBatch(ids);
+    }
+
+    @Override
+    public List<Transaction> findAllNonTransfers() {
+        return mapper.toDomain(jpa.findByNatureNotOrderByTransactionDateAscIdAsc(TransactionNature.TRANSFER));
     }
 
     @Override
