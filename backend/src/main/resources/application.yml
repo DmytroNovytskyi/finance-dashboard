@@ -21,5 +21,9 @@ management:
       exposure:
         include: health, info
 
+springdoc:
+  api-docs:
+    path: /v1/api-docs
+
 finance:
   base-currency: ${FINANCE_BASE_CURRENCY:PLN}
