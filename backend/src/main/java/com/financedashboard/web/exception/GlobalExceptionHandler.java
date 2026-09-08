@@ -1,6 +1,8 @@
 package com.financedashboard.web.exception;
 
 import com.financedashboard.application.exception.NotFoundException;
+import com.financedashboard.domain.exception.StatementParseException;
+import com.financedashboard.domain.exception.UnsupportedStatementException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import org.slf4j.Logger;
@@ -24,6 +26,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(UnsupportedStatementException.class)
+    public ResponseEntity<ApiError> handleUnsupportedStatement(
+            UnsupportedStatementException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(StatementParseException.class)
+    public ResponseEntity<ApiError> handleStatementParse(
+            StatementParseException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 

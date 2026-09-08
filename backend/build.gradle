@@ -26,6 +26,7 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation libs.mapstruct
     implementation libs.springdoc
+    implementation libs.pdfbox
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

@@ -22,4 +22,5 @@ public class Transaction {
     private final String description;
     private final String merchant;
     private final Long categoryId;
+    private final String dedupHash;
 }

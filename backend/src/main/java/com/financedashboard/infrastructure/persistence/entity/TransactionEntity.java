@@ -56,6 +56,9 @@ public class TransactionEntity {
     @Column(name = "category_id")
     private Long categoryId;
 
+    @Column(name = "dedup_hash")
+    private String dedupHash;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
