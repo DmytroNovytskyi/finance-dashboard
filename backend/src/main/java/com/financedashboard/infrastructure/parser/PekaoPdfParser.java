@@ -47,6 +47,9 @@ public class PekaoPdfParser implements BankStatementParser {
     private static final Pattern TRANSACTION_LINE = Pattern.compile(
             "^(\\d{2}/\\d{2}/\\d{4})\\s+(-?[0-9][0-9 .]*,[0-9]{2})\\s*(.*)$");
     private static final Pattern PAGE_FOOTER = Pattern.compile("^Strona\\s+\\d+/\\d+$");
+    private static final java.util.Set<String> ISO_CODES = java.util.Set.of(
+            "PLN", "EUR", "USD", "GBP", "CHF", "CZK", "SEK", "NOK", "DKK", "HUF", "JPY",
+            "CAD", "AUD", "RON", "BGN");
 
     @Override
     public boolean supports(String mediaType) {
@@ -166,19 +169,27 @@ public class PekaoPdfParser implements BankStatementParser {
         return raw.trim().startsWith("-") ? amount.negate() : amount;
     }
 
+    /**
+     * Detects the account currency from the header region (before the transaction table): the
+     * first line that carries the account number (many digits) plus an ISO currency code.
+     */
     private static String detectCurrency(String text) {
-        String[] lines = text.split("\\r?\\n");
-        for (String line : lines) {
-            if (!line.contains("PRZEKORZYSTNE")) {
+        int sectionStart = text.indexOf("Wyszczególnienie transakcji");
+        String header = sectionStart >= 0 ? text.substring(0, sectionStart) : text;
+        for (String line : header.split("\\r?\\n")) {
+            long digits = line.chars().filter(Character::isDigit).count();
+            if (digits < 10) {
                 continue;
             }
             Matcher m = Pattern.compile("\\b([A-Z]{3})\\b").matcher(line);
-            String last = null;
+            String lastIso = null;
             while (m.find()) {
-                last = m.group(1);
+                if (ISO_CODES.contains(m.group(1))) {
+                    lastIso = m.group(1);
+                }
             }
-            if (last != null) {
-                return last;
+            if (lastIso != null) {
+                return lastIso;
             }
         }
         return "PLN";

@@ -15,6 +15,8 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pdfbox.Loader;
@@ -25,10 +27,14 @@ import org.junit.jupiter.api.Test;
 /**
  * Optional real-statement validation. Reads the user's own Bank Pekao statement PDFs from the
  * git-ignored {@code local/} directory (never committed) and checks that the parser reconciles
- * each one to its own printed "Suma obrotów" debit/credit totals. The test is skipped when no
- * statements are present, so fresh clones still pass.
+ * each unique statement (deduped by content) to its own printed "Suma obrotów" totals and detects
+ * the right account currency. Skipped when no statements are present, so fresh clones pass.
  */
 class PekaoPdfParserMonthlyStatementsTest {
+
+    private static final Set<String> ISO = Set.of(
+            "PLN", "EUR", "USD", "GBP", "CHF", "CZK", "SEK", "NOK", "DKK", "HUF", "JPY",
+            "CAD", "AUD", "RON", "BGN");
 
     private final PekaoPdfParser parser = new PekaoPdfParser();
 
@@ -40,22 +46,26 @@ class PekaoPdfParserMonthlyStatementsTest {
         Path local = Paths.get("..", "local").toAbsolutePath().normalize();
         assumeTrue(Files.isDirectory(local), "local/ statements directory not present");
 
-        List<Path> unique = uniquePdfs(local);
+        List<PdfContent> unique = uniqueByContent(local);
         assumeTrue(!unique.isEmpty(), "no statement PDFs found under local/");
+        System.out.println("[statements] validating " + unique.size() + " unique statements");
 
-        for (Path pdf : unique) {
-            String name = pdf.getFileName().toString();
-            byte[] bytes = Files.readAllBytes(pdf);
+        for (PdfContent pdf : unique) {
+            String name = pdf.path.getFileName().toString();
+            assertThat(parser.canParse(pdf.bytes)).as(name).isTrue();
+            ParsedStatement statement = parser.parse(pdf.bytes);
+            System.out.println("[statements] " + name + " | " + statement.currency()
+                    + " | tx=" + statement.transactions().size());
 
-            assertThat(parser.canParse(bytes)).as(name).isTrue();
-            ParsedStatement statement = parser.parse(bytes);
-
-            Matcher summary = SUMMARY.matcher(extractText(bytes));
+            Matcher summary = SUMMARY.matcher(pdf.text);
             assertThat(summary.find())
                     .as(name + " has a Suma obrotów line")
                     .isTrue();
             BigDecimal expectedDebits = parsePlAmount(summary.group(1));
             BigDecimal expectedCredits = parsePlAmount(summary.group(2));
+
+            // currency detected in the header must appear among ISO codes in that header
+            assertThat(headerIsoCodes(pdf.text)).as(name + " header ISO codes").contains(statement.currency());
 
             BigDecimal debits = BigDecimal.ZERO;
             BigDecimal credits = BigDecimal.ZERO;
@@ -74,19 +84,38 @@ class PekaoPdfParserMonthlyStatementsTest {
         }
     }
 
-    private static List<Path> uniquePdfs(Path dir) throws Exception {
-        Map<String, Path> byHash = new LinkedHashMap<>();
+    private record PdfContent(Path path, byte[] bytes, String text) {
+    }
+
+    private static List<PdfContent> uniqueByContent(Path dir) throws Exception {
+        Map<String, PdfContent> byText = new LinkedHashMap<>();
         try (var stream = Files.list(dir)) {
             List<Path> pdfs = stream.filter(p -> p.getFileName().toString().toLowerCase().endsWith(".pdf"))
                     .sorted()
                     .toList();
             for (Path pdf : pdfs) {
+                byte[] bytes = Files.readAllBytes(pdf);
+                String text = extractText(bytes);
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                String hash = HexFormat.of().formatHex(digest.digest(Files.readAllBytes(pdf)));
-                byHash.putIfAbsent(hash, pdf);
+                String hash = HexFormat.of().formatHex(digest.digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                byText.putIfAbsent(hash, new PdfContent(pdf, bytes, text));
             }
         }
-        return new ArrayList<>(byHash.values());
+        return new ArrayList<>(byText.values());
+    }
+
+    /** ISO codes appearing in the statement header (before the transaction table). */
+    private static Set<String> headerIsoCodes(String text) {
+        int sectionStart = text.indexOf("Wyszczególnienie transakcji");
+        String header = sectionStart >= 0 ? text.substring(0, sectionStart) : text;
+        Set<String> found = new TreeSet<>();
+        Matcher m = Pattern.compile("\\b([A-Z]{3})\\b").matcher(header);
+        while (m.find()) {
+            if (ISO.contains(m.group(1))) {
+                found.add(m.group(1));
+            }
+        }
+        return found;
     }
 
     private static BigDecimal parsePlAmount(String raw) {
