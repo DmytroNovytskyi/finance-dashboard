@@ -3,9 +3,10 @@ import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
 import { useCategories } from '../../api/queries'
 import { CategoryManager } from './CategoryManager'
+import { MerchantDefaults } from './MerchantDefaults'
 import { UncategorizedQueue } from './UncategorizedQueue'
 
-/** Tag uncategorized transactions and manage the spending categories. */
+/** Tag uncategorized transactions, manage categories, and set merchant defaults. */
 export function CategorizePage() {
   const categories = useCategories()
   return (
@@ -20,7 +21,10 @@ export function CategorizePage() {
       </Box>
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <CategoryManager categories={categories} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CategoryManager categories={categories} />
+            <MerchantDefaults categories={categories} />
+          </Box>
         </Grid>
         <Grid size={{ xs: 12, lg: 8 }}>
           <UncategorizedQueue categories={categories} />

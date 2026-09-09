@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { categoriesApi, transactionsApi } from '../../api/endpoints'
+import { categoriesApi, merchantRulesApi, transactionsApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
 
 function useInvalidate(...keys: ReadonlyArray<readonly string[]>) {
@@ -60,6 +60,37 @@ export function useDeleteCategory() {
   const invalidate = useInvalidate(queryKeys.categories, queryKeys.statistics.root, queryKeys.transactions.root)
   return useMutation({
     mutationFn: (id: number) => categoriesApi.remove(id),
+    onSuccess: invalidate,
+  })
+}
+
+/** Merchant-to-category defaults. */
+export function useMerchantRules() {
+  return useQuery({ queryKey: queryKeys.merchantRules, queryFn: merchantRulesApi.list })
+}
+
+export function useCreateMerchantRule() {
+  const invalidate = useInvalidate(queryKeys.merchantRules)
+  return useMutation({
+    mutationFn: ({ merchant, categoryId }: { merchant: string; categoryId: number }) =>
+      merchantRulesApi.create({ merchant, categoryId }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteMerchantRule() {
+  const invalidate = useInvalidate(queryKeys.merchantRules)
+  return useMutation({
+    mutationFn: (id: number) => merchantRulesApi.remove(id),
+    onSuccess: invalidate,
+  })
+}
+
+/** Applies all defaults to the uncategorized history. */
+export function useApplyMerchantRules() {
+  const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
+  return useMutation({
+    mutationFn: () => merchantRulesApi.apply(),
     onSuccess: invalidate,
   })
 }

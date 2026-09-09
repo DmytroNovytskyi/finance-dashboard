@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
 import CircularProgress from '@mui/material/CircularProgress'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
@@ -13,13 +14,23 @@ import type { CategoryPresentation } from '../../api/queries'
 import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
 import type { Transaction } from '../../types'
-import { useCategorizeBulk, useCategorizeOne, useUncategorizedQueue } from './hooks'
+import {
+  useCategorizeBulk,
+  useCategorizeOne,
+  useCreateMerchantRule,
+  useMerchantRules,
+  useUncategorizedQueue,
+} from './hooks'
 
 interface UncategorizedQueueProps {
   categories: CategoryPresentation[]
 }
 
 const QUEUE_SIZE = 200
+
+function normalizeMerchant(value: string): string {
+  return value.trim().toUpperCase().replace(/\s+/g, ' ')
+}
 
 function RowAmount({ transaction }: { transaction: Transaction }) {
   const scheme = useScheme()
@@ -36,12 +47,19 @@ function RowAmount({ transaction }: { transaction: Transaction }) {
 export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const [nature, setNature] = useState<'EXPENSE' | 'INCOME'>('EXPENSE')
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
+  const [remember, setRemember] = useState(false)
   const queue = useUncategorizedQueue(nature)
   const categorizeOne = useCategorizeOne()
   const categorizeBulk = useCategorizeBulk()
+  const rules = useMerchantRules()
+  const createRule = useCreateMerchantRule()
 
   const rows = queue.data?.content ?? []
   const total = queue.data?.totalElements ?? 0
+
+  const single = selected.size === 1 ? rows.find((row) => selected.has(row.id)) : undefined
+  const merchant = single?.merchant ?? null
+  const hasRule = merchant !== null && (rules.data ?? []).some((rule) => rule.merchant === normalizeMerchant(merchant))
 
   const toggle = (id: number) => {
     const next = new Set(selected)
@@ -53,8 +71,12 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const assignOne = (id: number, categoryId: number) => categorizeOne.mutate({ id, categoryId })
   const assignMany = (categoryId: number) => {
     if (selected.size === 0) return
+    if (remember && merchant) {
+      createRule.mutate({ merchant, categoryId })
+    }
     categorizeBulk.mutate({ ids: [...selected], categoryId })
     setSelected(new Set())
+    setRemember(false)
   }
 
   const selectVisible = (checked: boolean) => {
@@ -80,6 +102,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
             if (value) {
               setNature(value)
               setSelected(new Set())
+              setRemember(false)
             }
           }}
         >
@@ -89,10 +112,23 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
       </Box>
 
       {selected.size > 0 ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: 'action.selected', borderRadius: 2, px: 2, py: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', bgcolor: 'action.selected', borderRadius: 2, px: 2, py: 1 }}>
           <Typography variant="body2" sx={{ mr: 'auto' }}>
             {selected.size} selected
           </Typography>
+          {single && merchant ? (
+            <FormControlLabel
+              control={
+                <Checkbox size="small" checked={remember} disabled={hasRule} onChange={(event) => setRemember(event.target.checked)} />
+              }
+              label={
+                <Typography variant="body2" color={hasRule ? 'text.disabled' : 'text.secondary'}>
+                  {hasRule ? 'Already has a default' : `Remember ${merchant.slice(0, 40)}`}
+                </Typography>
+              }
+              sx={{ m: 0 }}
+            />
+          ) : null}
           <Select
             size="small"
             displayEmpty
