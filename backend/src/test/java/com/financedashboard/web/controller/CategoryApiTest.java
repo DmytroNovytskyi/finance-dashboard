@@ -81,4 +81,29 @@ class CategoryApiTest extends AbstractIntegrationTest {
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void createAfterSeededExplicitIdsUsesFreshId() throws Exception {
+        // Reproduces the V1 seeding scenario on a real DB: rows carry explicit ids 1..3 and the
+        // identity sequence is synced to 3 (as V2 does). A create must then get id 4, not reuse a
+        // colliding low id.
+        jdbcTemplate.update(
+                "insert into category (id, name, color, sort_order) values (1, 'Seed A', null, 0),"
+                        + " (2, 'Seed B', null, 0), (3, 'Seed C', null, 0)");
+        jdbcTemplate.queryForObject(
+                "select setval(pg_get_serial_sequence('category', 'id'), greatest((select max(id) from category), 1))",
+                Long.class);
+
+        String body = mockMvc.perform(post("/api/v1/categories")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Fresh"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(objectMapper.readTree(body).get("id").asLong())
+                .isGreaterThan(3L);
+    }
 }
