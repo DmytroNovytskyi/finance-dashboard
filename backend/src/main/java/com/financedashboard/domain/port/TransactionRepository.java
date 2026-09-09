@@ -58,6 +58,12 @@ public interface TransactionRepository {
     List<Transaction> findAllNonTransfers();
 
     /**
+     * Returns transactions that have no category and are not internal transfers, oldest first.
+     * Candidates for applying merchant default rules.
+     */
+    List<Transaction> findUncategorized();
+
+    /**
      * Returns one page of transactions matching {@code filter}, ordered by transaction date
      * descending then id descending.
      */

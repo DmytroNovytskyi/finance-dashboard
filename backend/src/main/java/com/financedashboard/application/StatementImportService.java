@@ -3,10 +3,12 @@ package com.financedashboard.application;
 import com.financedashboard.application.exception.NotFoundException;
 import com.financedashboard.domain.account.Account;
 import com.financedashboard.domain.exception.UnsupportedStatementException;
+import com.financedashboard.domain.merchant_rule.MerchantRule;
 import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementParser;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.FxRateProvider;
+import com.financedashboard.domain.port.MerchantRuleRepository;
 import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.domain.statement.ParsedStatement;
@@ -19,6 +21,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,6 +43,7 @@ public class StatementImportService {
     private final TransactionRepository transactions;
     private final AccountRepository accounts;
     private final FxRateProvider fxRates;
+    private final MerchantRuleRepository merchantRules;
 
     @Value("${finance.base-currency:PLN}")
     private String baseCurrency;
@@ -87,9 +91,26 @@ public class StatementImportService {
         List<Transaction> fresh = rows.stream()
                 .filter(tx -> !existing.contains(tx.getDedupHash()))
                 .toList();
-        transactions.saveAll(fresh);
+        Map<String, Long> ruleCategory = merchantRules.findAll().stream()
+                .collect(Collectors.toMap(MerchantRule::getMerchant, MerchantRule::getCategoryId));
+        List<Transaction> tagged = fresh.stream()
+                .map(tx -> applyMerchantRules(tx, ruleCategory))
+                .toList();
+        transactions.saveAll(tagged);
 
         return new StatementImportResult(saved.getId(), false, fresh.size(), rows.size() - fresh.size());
+    }
+
+    private static Transaction applyMerchantRules(Transaction transaction, Map<String, Long> ruleCategory) {
+        if (ruleCategory.isEmpty() || transaction.getCategoryId() != null) {
+            return transaction;
+        }
+        String merchant = transaction.getMerchant();
+        if (merchant == null || merchant.isBlank()) {
+            return transaction;
+        }
+        Long categoryId = ruleCategory.get(MerchantRuleService.normalize(merchant));
+        return categoryId == null ? transaction : transaction.toBuilder().categoryId(categoryId).build();
     }
 
     private Transaction toTransaction(com.financedashboard.domain.statement.ParsedTransaction tx,

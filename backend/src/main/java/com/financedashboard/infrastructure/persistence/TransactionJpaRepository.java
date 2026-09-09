@@ -20,6 +20,8 @@ public interface TransactionJpaRepository
 
     List<TransactionEntity> findByNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
 
+    List<TransactionEntity> findByCategoryIdIsNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
+
     List<TransactionEntity> findByStatementId(Long statementId);
 
     boolean existsByStatementId(Long statementId);

@@ -1,0 +1,155 @@
+package com.financedashboard.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.financedashboard.application.exception.NotFoundException;
+import com.financedashboard.application.MerchantRuleService.RuleDetail;
+import com.financedashboard.domain.category.Category;
+import com.financedashboard.domain.merchant_rule.MerchantRule;
+import com.financedashboard.domain.port.CategoryRepository;
+import com.financedashboard.domain.port.MerchantRuleRepository;
+import com.financedashboard.domain.port.TransactionRepository;
+import com.financedashboard.domain.transaction.Transaction;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class MerchantRuleServiceTest {
+
+    private static final long CATEGORY = 7L;
+
+    @Mock
+    private MerchantRuleRepository rules;
+
+    @Mock
+    private CategoryRepository categories;
+
+    @Mock
+    private TransactionRepository transactions;
+
+    @InjectMocks
+    private MerchantRuleService service;
+
+    private static Category category(long id, String name) {
+        return Category.builder().id(id).name(name).color("#123456").sortOrder(0).build();
+    }
+
+    @Test
+    void createNormalizesMerchantAndResolvesCategory() {
+        when(categories.existsById(CATEGORY)).thenReturn(true);
+        when(rules.existsByMerchant("EXAMPLE MERCHANT")).thenReturn(false);
+        when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
+        when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RuleDetail created = service.create("  Example Merchant  ", CATEGORY);
+
+        assertThat(created.merchant()).isEqualTo("EXAMPLE MERCHANT");
+        assertThat(created.categoryName()).isEqualTo("Taxes");
+        assertThat(created.categoryId()).isEqualTo(CATEGORY);
+    }
+
+    @Test
+    void createRejectsBlankMerchant() {
+        assertThatThrownBy(() -> service.create("   ", CATEGORY))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void createRejectsUnknownCategory() {
+        when(categories.existsById(CATEGORY)).thenReturn(false);
+        assertThatThrownBy(() -> service.create("Merchant", CATEGORY))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void createRejectsDuplicateMerchant() {
+        when(categories.existsById(CATEGORY)).thenReturn(true);
+        when(rules.existsByMerchant("EXAMPLE MERCHANT")).thenReturn(true);
+        assertThatThrownBy(() -> service.create("example merchant", CATEGORY))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void listJoinsCategoryDisplayFields() {
+        MerchantRule rule = MerchantRule.builder().id(3L).merchant("EXAMPLE MERCHANT").categoryId(CATEGORY).build();
+        when(rules.findAll()).thenReturn(List.of(rule));
+        when(categories.findAll()).thenReturn(List.of(category(CATEGORY, "Taxes")));
+
+        RuleDetail detail = service.list().get(0);
+
+        assertThat(detail.merchant()).isEqualTo("EXAMPLE MERCHANT");
+        assertThat(detail.categoryName()).isEqualTo("Taxes");
+        assertThat(detail.color()).isEqualTo("#123456");
+    }
+
+    @Test
+    void deleteUnknownRuleThrowsNotFound() {
+        when(rules.existsById(99L)).thenReturn(false);
+        assertThatThrownBy(() -> service.delete(99L))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void deleteExistingRuleRemovesIt() {
+        when(rules.existsById(3L)).thenReturn(true);
+        service.delete(3L);
+        verify(rules).deleteById(3L);
+    }
+
+    @Test
+    void applyAssignsOnlyExactNormalizedMerchants() {
+        MerchantRule rule = MerchantRule.builder().merchant("EXAMPLE MERCHANT").categoryId(CATEGORY).build();
+        when(rules.findAll()).thenReturn(List.of(rule));
+        Transaction match = transaction(1L, "Example Merchant");
+        Transaction different = transaction(2L, "EXAMPLE STORE");
+        Transaction noMerchant = transaction(3L, null);
+        when(transactions.findUncategorized()).thenReturn(List.of(match, different, noMerchant));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int applied = service.applyToUncategorized();
+
+        assertThat(applied).isEqualTo(1);
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getCategoryId()).isEqualTo(CATEGORY);
+    }
+
+    @Test
+    void applyWithNoRulesReturnsZeroWithoutScanning() {
+        when(rules.findAll()).thenReturn(List.of());
+        assertThat(service.applyToUncategorized()).isZero();
+        verify(transactions, never()).findUncategorized();
+    }
+
+    @Test
+    void normalizeCollapsesCaseAndWhitespace() {
+        assertThat(MerchantRuleService.normalize("  Example\tmerchant ")).isEqualTo("EXAMPLE MERCHANT");
+        assertThat(MerchantRuleService.normalize(null)).isEmpty();
+    }
+
+    private static Transaction transaction(long id, String merchant) {
+        return Transaction.builder()
+                .id(id)
+                .statementId(1L)
+                .accountId(1L)
+                .transactionDate(LocalDate.of(2026, 3, 1))
+                .amount(BigDecimal.valueOf(-100))
+                .currency("PLN")
+                .merchant(merchant)
+                .build();
+    }
+}

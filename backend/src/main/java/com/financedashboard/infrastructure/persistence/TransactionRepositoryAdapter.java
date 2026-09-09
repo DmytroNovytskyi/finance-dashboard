@@ -138,6 +138,11 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public List<Transaction> findUncategorized() {
+        return mapper.toDomain(jpa.findByCategoryIdIsNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature.TRANSFER));
+    }
+
+    @Override
     public PagedTransactions search(TransactionFilter filter, int page, int size) {
         Page<TransactionEntity> result = jpa.findAll(toSpecification(filter),
                 PageRequest.of(page, size, DEFAULT_SORT));
