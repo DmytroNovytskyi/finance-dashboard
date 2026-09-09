@@ -70,6 +70,8 @@ export interface StatementImportResult {
   skipped: number
 }
 
+export type StatisticsGranularity = 'day' | 'week' | 'month' | 'quarter' | 'year'
+
 export interface StatisticsSummary {
   from: string | null
   to: string | null
@@ -78,7 +80,27 @@ export interface StatisticsSummary {
   byMonth: StatisticsByMonth[]
   byCategory: StatisticsByCategory[]
   topMerchants: StatisticsByMerchant[]
+  trend: StatisticsTrendPoint[]
   unconverted: number
+}
+
+export interface StatisticsTrendPoint {
+  /** ISO start date of the time bucket, e.g. "2026-03-01". */
+  start: string
+  /** Inclusive ISO end date of the time bucket. */
+  end: string
+  income: number
+  expense: number
+  net: number
+}
+
+/** A user-managed merchant-to-category default. */
+export interface MerchantRule {
+  id: number
+  merchant: string
+  categoryId: number
+  categoryName: string | null
+  color: string | null
 }
 
 export interface StatisticsTotals {

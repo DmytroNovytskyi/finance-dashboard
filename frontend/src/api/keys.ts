@@ -4,6 +4,7 @@ import type { StatisticsParams, TransactionListParams } from './endpoints'
 export const queryKeys = {
   accounts: ['accounts'] as const,
   categories: ['categories'] as const,
+  merchantRules: ['merchant-rules'] as const,
   statements: ['statements'] as const,
   transactions: {
     root: ['transactions'] as const,

@@ -1,9 +1,11 @@
 import type {
   Account,
   Category,
+  MerchantRule,
   PageResponse,
   Statement,
   StatementImportResult,
+  StatisticsGranularity,
   StatisticsSummary,
   Transaction,
   TransactionNature,
@@ -28,6 +30,7 @@ export interface StatisticsParams {
   accountId?: number
   kind?: string
   topN?: number
+  granularity?: StatisticsGranularity
 }
 
 export interface CategoryInput {
@@ -79,4 +82,12 @@ export const transactionsApi = {
 export const statisticsApi = {
   summary: (params: StatisticsParams) =>
     request<StatisticsSummary>(`/statistics/summary${buildQuery(params)}`),
+}
+
+export const merchantRulesApi = {
+  list: () => request<MerchantRule[]>('/merchant-rules'),
+  create: (input: { merchant: string; categoryId: number }) =>
+    request<MerchantRule>('/merchant-rules', { method: 'POST', body: JSON.stringify(input) }),
+  remove: (id: number) => request<void>(`/merchant-rules/${id}`, { method: 'DELETE' }),
+  apply: () => request<{ applied: number }>('/merchant-rules/apply', { method: 'POST' }),
 }

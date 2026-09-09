@@ -19,7 +19,7 @@ import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 
-const DRAWER_WIDTH = 240
+const DRAWER_WIDTH = 280
 
 const NAV_ITEMS = [
   { to: '/', label: 'Overview', icon: Dashboard, end: true },
@@ -61,8 +61,8 @@ export function AppShell() {
       >
         {!isMobile ? (
           <Toolbar sx={{ gap: 1.5, px: 2 }}>
-            <AccountBalanceWallet color="primary" />
-            <Typography variant="h6" noWrap>
+            <AccountBalanceWallet color="primary" sx={{ flexShrink: 0 }} />
+            <Typography variant="h6" sx={{ whiteSpace: 'nowrap' }}>
               Finance Dashboard
             </Typography>
           </Toolbar>

@@ -66,6 +66,41 @@ export function formatMonthKey(key: string): string {
   return monthFormatter.format(new Date(year, month - 1, 1))
 }
 
+const shortDateFormatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
+
+/** Formats an ISO date as a compact label, e.g. "2026-03-05" -> "5 Mar". */
+export function formatShortDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  return shortDateFormatter.format(new Date(year, month - 1, day))
+}
+
+/** Formats an inclusive range like "5 Mar – 8 Mar 2026" (single-day ranges show one date). */
+export function formatDateRange(startISO: string, endISO: string): string {
+  if (startISO === endISO) return formatDate(startISO)
+  const start = formatShortDate(startISO)
+  const end = formatDate(endISO)
+  const startParts = start.split(' ')
+  const endParts = end.split(' ')
+  return startParts[0] === endParts[0] ? `${start} – ${end}` : `${start} – ${end}`
+}
+
+/** Concise bucket label for a trend axis/chip, derived from the bucket start date. */
+export function formatTrendBucket(startISO: string, granularity: 'day' | 'week' | 'month' | 'quarter' | 'year'): string {
+  const [year, month] = startISO.split('-').map(Number)
+  switch (granularity) {
+    case 'day':
+      return formatShortDate(startISO)
+    case 'week':
+      return `w/c ${formatShortDate(startISO)}`
+    case 'month':
+      return monthFormatter.format(new Date(year, month - 1, 1))
+    case 'quarter':
+      return `Q${Math.floor((month - 1) / 3) + 1} ${year}`
+    case 'year':
+      return String(year)
+  }
+}
+
 const dateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
   month: 'short',
