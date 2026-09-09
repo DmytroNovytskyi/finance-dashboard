@@ -24,6 +24,16 @@ export function formatMoneyMagnitude(amount: number, currency: string): string {
   return formatMoney(Math.abs(amount), currency)
 }
 
+const compactFormatter = new Intl.NumberFormat('en', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+
+/** Formats a number compactly for axis ticks, e.g. 12500 -> "12.5K". */
+export function formatCompact(value: number): string {
+  return compactFormatter.format(value)
+}
+
 const intCache = new Map<string, Intl.NumberFormat>()
 
 function intFormat(): Intl.NumberFormat {
