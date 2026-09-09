@@ -14,6 +14,7 @@ public record StatisticsSummaryResponse(
         List<Monthly> byMonth,
         List<Category> byCategory,
         List<Merchant> topMerchants,
+        List<TrendPoint> trend,
         long unconverted) {
 
     public static StatisticsSummaryResponse from(Summary s) {
@@ -25,6 +26,7 @@ public record StatisticsSummaryResponse(
                 s.byMonth().stream().map(Monthly::from).toList(),
                 s.byCategory().stream().map(Category::from).toList(),
                 s.topMerchants().stream().map(Merchant::from).toList(),
+                s.trend().stream().map(TrendPoint::from).toList(),
                 s.unconverted());
     }
 
@@ -76,6 +78,19 @@ public record StatisticsSummaryResponse(
 
         static Merchant from(com.financedashboard.application.StatisticsService.MerchantTotal m) {
             return new Merchant(m.merchant(), m.count(), m.income(), m.expense(), m.net());
+        }
+    }
+
+    /** API representation of one time bucket of the trend. */
+    public record TrendPoint(
+            LocalDate start,
+            LocalDate end,
+            BigDecimal income,
+            BigDecimal expense,
+            BigDecimal net) {
+
+        static TrendPoint from(com.financedashboard.application.StatisticsService.TrendPoint p) {
+            return new TrendPoint(p.start(), p.end(), p.income(), p.expense(), p.net());
         }
     }
 }

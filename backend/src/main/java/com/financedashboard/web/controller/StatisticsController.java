@@ -1,6 +1,7 @@
 package com.financedashboard.web.controller;
 
 import com.financedashboard.application.StatisticsService;
+import com.financedashboard.application.TrendGranularity;
 import com.financedashboard.domain.account.AccountKind;
 import com.financedashboard.web.dto.StatisticsSummaryResponse;
 import java.time.LocalDate;
@@ -32,7 +33,9 @@ public class StatisticsController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long accountId,
             @RequestParam(required = false) AccountKind kind,
-            @RequestParam(required = false) Integer topN) {
-        return StatisticsSummaryResponse.from(statistics.summary(from, to, accountId, kind, topN));
+            @RequestParam(required = false) Integer topN,
+            @RequestParam(required = false) String granularity) {
+        return StatisticsSummaryResponse.from(
+                statistics.summary(from, to, accountId, kind, topN, TrendGranularity.from(granularity)));
     }
 }

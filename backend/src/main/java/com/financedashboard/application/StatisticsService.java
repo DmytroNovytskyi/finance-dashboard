@@ -66,6 +66,15 @@ public class StatisticsService {
             BigDecimal net) {
     }
 
+    /** Money totals for one time bucket of the chosen trend granularity. */
+    public record TrendPoint(
+            LocalDate start,
+            LocalDate end,
+            BigDecimal income,
+            BigDecimal expense,
+            BigDecimal net) {
+    }
+
     /** Money totals for one category; {@code categoryId} is null for uncategorized rows. */
     public record CategoryTotal(
             Long categoryId,
@@ -94,15 +103,23 @@ public class StatisticsService {
             List<MonthlyTotal> byMonth,
             List<CategoryTotal> byCategory,
             List<MerchantTotal> topMerchants,
-            long unconverted) {
+            long unconverted,
+            List<TrendPoint> trend) {
+    }
+
+    /** {@link #summary(LocalDate, LocalDate, Long, AccountKind, Integer, TrendGranularity)} at month granularity. */
+    public Summary summary(LocalDate from, LocalDate to, Long accountId, AccountKind kind, Integer topN) {
+        return summary(from, to, accountId, kind, topN, TrendGranularity.MONTH);
     }
 
     /**
      * Computes the summary for the inclusive date range. The range is restricted to one account
      * when {@code accountId} is set, otherwise to accounts of the given {@code kind} when set,
      * otherwise to all accounts. {@code topN} bounds the merchant list (1..50, default 10).
+     * {@code granularity} selects the time buckets of the returned {@code trend}.
      */
-    public Summary summary(LocalDate from, LocalDate to, Long accountId, AccountKind kind, Integer topN) {
+    public Summary summary(LocalDate from, LocalDate to, Long accountId, AccountKind kind, Integer topN,
+                           TrendGranularity granularity) {
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("'from' must not be after 'to'");
         }
@@ -116,6 +133,7 @@ public class StatisticsService {
 
         Sums totals = new Sums();
         Map<YearMonth, Sums> byMonth = new LinkedHashMap<>();
+        Map<LocalDate, Sums> byBucket = new LinkedHashMap<>();
         Map<Long, Sums> byCategory = new LinkedHashMap<>();
         Map<String, Sums> byMerchant = new LinkedHashMap<>();
         LocalDate minDate = null;
@@ -134,6 +152,8 @@ public class StatisticsService {
             }
             totals.add(base);
             byMonth.computeIfAbsent(YearMonth.from(date), m -> new Sums()).add(base);
+            TrendGranularity.Bucket bucket = granularity.bucketOf(date);
+            byBucket.computeIfAbsent(bucket.start(), k -> new Sums()).add(base);
             byCategory.computeIfAbsent(tx.getCategoryId(), c -> new Sums()).add(base);
             String merchant = tx.getMerchant() == null || tx.getMerchant().isBlank()
                     ? NO_MERCHANT_LABEL : tx.getMerchant().trim();
@@ -152,6 +172,16 @@ public class StatisticsService {
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> new MonthlyTotal(e.getKey().toString(), e.getValue().income,
                         e.getValue().expense, e.getValue().net()))
+                .toList();
+
+        List<TrendPoint> trend = byBucket.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    LocalDate start = e.getKey();
+                    LocalDate end = granularity.bucketOf(start).end();
+                    Sums sums = e.getValue();
+                    return new TrendPoint(start, end, sums.income, sums.expense, sums.net());
+                })
                 .toList();
 
         List<CategoryTotal> categoryTotals = new ArrayList<>();
@@ -174,7 +204,7 @@ public class StatisticsService {
                 .limit(clampTopN(topN))
                 .toList();
 
-        return new Summary(from, to, baseCurrency, total, monthly, categoryTotals, topMerchants, unconverted);
+        return new Summary(from, to, baseCurrency, total, monthly, categoryTotals, topMerchants, unconverted, trend);
     }
 
     private Collection<Long> resolveAccountIds(Long accountId, AccountKind kind) {

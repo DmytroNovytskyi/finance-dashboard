@@ -155,6 +155,33 @@ class StatisticsApiTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/statistics/summary").param("from", "not-a-date"))
                 .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/statistics/summary").param("granularity", "not-a-granularity"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void trendBucketsFollowGranularityParam() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "ht");
+        insertTx(statement, account, "2026-03-10", "-100", "EXPENSE", null, "Shop");
+        insertTx(statement, account, "2026-03-11", "-50", "EXPENSE", null, "Shop");
+        insertTx(statement, account, "2026-04-01", "-30", "EXPENSE", null, "Shop");
+
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-04-30")
+                        .param("granularity", "day"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.trend.length()").value(3))
+                .andExpect(jsonPath("$.trend[0].start").value("2026-03-10"))
+                .andExpect(jsonPath("$.trend[0].expense").value(100.0))
+                .andExpect(jsonPath("$.trend[2].expense").value(30.0));
+
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("granularity", "month"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.trend.length()").value(2));
     }
 
     private long insertAccount(String currency, String kind) {
