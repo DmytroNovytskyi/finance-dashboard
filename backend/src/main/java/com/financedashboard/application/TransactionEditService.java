@@ -7,6 +7,7 @@ import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionNature;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -16,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Use cases that modify transactions: categorization, transfer pairing, and range deletion. */
+/** Use cases that modify transactions and statements: categorization, pairing, and deletion. */
 @Service
 @RequiredArgsConstructor
 public class TransactionEditService {
@@ -88,27 +89,52 @@ public class TransactionEditService {
         if (doomed.isEmpty()) {
             return 0;
         }
+        unpairSurvivingTransferLegs(doomed);
+        transactions.deleteAll(doomed);
+        removeEmptyStatements(doomed);
+        return doomed.size();
+    }
+
+    /**
+     * Deletes the statement with the given id and the transaction rows it introduced, so its file
+     * can be re-imported. If one leg of a paired transfer is among those rows, the surviving leg is
+     * un-paired back to its natural nature.
+     */
+    @Transactional
+    public int deleteStatement(Long id) {
+        statements.findById(id)
+                .orElseThrow(() -> new NotFoundException("Statement " + id + " not found"));
+        List<Transaction> rows = transactions.findByStatementId(id);
+        unpairSurvivingTransferLegs(rows);
+        if (!rows.isEmpty()) {
+            transactions.deleteAll(rows);
+        }
+        statements.deleteById(id);
+        return rows.size();
+    }
+
+    private void unpairSurvivingTransferLegs(Collection<Transaction> doomed) {
         Set<Long> doomedIds = doomed.stream().map(Transaction::getId).collect(Collectors.toSet());
         List<UUID> groups = doomed.stream()
                 .map(Transaction::getTransferGroupId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        List<Transaction> survivingLegs = groups.isEmpty()
-                ? List.of()
-                : transactions.findByTransferGroupIds(groups).stream()
-                        .filter(tx -> !doomedIds.contains(tx.getId()))
-                        .toList();
-
-        transactions.deleteAll(doomed);
-
+        if (groups.isEmpty()) {
+            return;
+        }
+        List<Transaction> survivingLegs = transactions.findByTransferGroupIds(groups).stream()
+                .filter(transaction -> !doomedIds.contains(transaction.getId()))
+                .toList();
         for (Transaction leg : survivingLegs) {
             transactions.save(leg.toBuilder()
                     .transferGroupId(null)
                     .nature(TransactionNature.forSignedAmount(leg.getAmount()))
                     .build());
         }
+    }
 
+    private void removeEmptyStatements(Collection<Transaction> doomed) {
         doomed.stream()
                 .map(Transaction::getStatementId)
                 .filter(Objects::nonNull)
@@ -118,7 +144,6 @@ public class TransactionEditService {
                         statements.deleteById(statementId);
                     }
                 });
-        return doomed.size();
     }
 
     private Transaction get(Long id) {

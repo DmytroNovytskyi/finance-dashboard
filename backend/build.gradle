@@ -50,3 +50,25 @@ tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'finance.history-loader', System.getProperty('finance.history-loader', 'false')
 }
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        csv.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                minimum = 0.85
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'jacocoTestCoverageVerification'
+}

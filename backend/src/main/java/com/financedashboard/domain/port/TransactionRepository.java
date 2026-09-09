@@ -6,6 +6,7 @@ import com.financedashboard.domain.transaction.TransactionFilter;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +41,15 @@ public interface TransactionRepository {
 
     /** Returns whether any transaction belongs to the statement with the given id. */
     boolean existsByStatementId(Long statementId);
+
+    /** Returns all transactions that belong to the statement with the given id. */
+    List<Transaction> findByStatementId(Long statementId);
+
+    /**
+     * Returns the number of stored transactions per statement, keyed by statement id. Statements
+     * with no transactions are absent from the map.
+     */
+    Map<Long, Long> countByStatementIds(Collection<Long> statementIds);
 
     /** Deletes the given transactions. */
     void deleteAll(Collection<Transaction> transactions);

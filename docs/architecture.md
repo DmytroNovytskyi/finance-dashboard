@@ -58,3 +58,9 @@ average daily expense) plus the same split by month, by category (uncategorized 
 rows lacking a base amount (foreign currency without an import-time rate) are counted in an
 `unconverted` field rather than the money buckets. `kind` restricts to accounts tagged
 `PERSONAL`/`BUSINESS` (the informal business profit/loss view).
+
+Statements: `POST /api/v1/statements` (multipart import for one account),
+`GET /api/v1/statements` (list, newest first, each with the count of stored transactions it
+introduced), and `DELETE /api/v1/statements/{id}` (removes the statement and the transaction rows
+it introduced, un-pairing any surviving transfer leg, so its file can be re-imported). Original
+documents are not stored — only their metadata and the parsed, deduplicated transactions.

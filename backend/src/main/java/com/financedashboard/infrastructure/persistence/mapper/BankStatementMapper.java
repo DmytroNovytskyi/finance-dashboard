@@ -2,6 +2,7 @@ package com.financedashboard.infrastructure.persistence.mapper;
 
 import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.infrastructure.persistence.entity.BankStatementEntity;
+import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.ReportingPolicy;
 
@@ -12,4 +13,6 @@ public interface BankStatementMapper {
     BankStatement toDomain(BankStatementEntity entity);
 
     BankStatementEntity toEntity(BankStatement statement);
+
+    List<BankStatement> toDomain(List<BankStatementEntity> entities);
 }

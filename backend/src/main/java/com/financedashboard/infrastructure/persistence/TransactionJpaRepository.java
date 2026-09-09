@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Spring Data repository for the {@code transaction} table. */
 public interface TransactionJpaRepository
@@ -18,5 +20,18 @@ public interface TransactionJpaRepository
 
     List<TransactionEntity> findByNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
 
+    List<TransactionEntity> findByStatementId(Long statementId);
+
     boolean existsByStatementId(Long statementId);
+
+    @Query("select t.statementId as statementId, count(t) as transactionCount "
+            + "from TransactionEntity t where t.statementId in :statementIds group by t.statementId")
+    List<StatementTransactionCount> countByStatementIdIn(@Param("statementIds") Collection<Long> statementIds);
+
+    /** Row count of stored transactions per statement, from a grouped query. */
+    interface StatementTransactionCount {
+        Long getStatementId();
+
+        Long getTransactionCount();
+    }
 }

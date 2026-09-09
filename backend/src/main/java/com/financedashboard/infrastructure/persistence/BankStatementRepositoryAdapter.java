@@ -3,6 +3,7 @@ package com.financedashboard.infrastructure.persistence;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.infrastructure.persistence.mapper.BankStatementMapper;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,11 @@ public class BankStatementRepositoryAdapter implements BankStatementRepository {
     @Override
     public BankStatement save(BankStatement statement) {
         return mapper.toDomain(jpa.save(mapper.toEntity(statement)));
+    }
+
+    @Override
+    public List<BankStatement> findAllByOrderByImportedAtDesc() {
+        return mapper.toDomain(jpa.findAllByOrderByImportedAtDesc());
     }
 
     @Override

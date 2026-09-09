@@ -15,8 +15,10 @@ import jakarta.persistence.criteria.Root;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -107,6 +109,21 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     @Override
     public boolean existsByStatementId(Long statementId) {
         return jpa.existsByStatementId(statementId);
+    }
+
+    @Override
+    public List<Transaction> findByStatementId(Long statementId) {
+        return mapper.toDomain(jpa.findByStatementId(statementId));
+    }
+
+    @Override
+    public Map<Long, Long> countByStatementIds(Collection<Long> statementIds) {
+        Map<Long, Long> counts = new HashMap<>();
+        for (TransactionJpaRepository.StatementTransactionCount row
+                : jpa.countByStatementIdIn(statementIds)) {
+            counts.put(row.getStatementId(), row.getTransactionCount());
+        }
+        return counts;
     }
 
     @Override

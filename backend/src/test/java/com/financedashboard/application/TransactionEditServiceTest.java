@@ -9,11 +9,14 @@ import static org.mockito.Mockito.when;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.CategoryRepository;
 import com.financedashboard.domain.port.TransactionRepository;
+import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionNature;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,6 +46,23 @@ class TransactionEditServiceTest {
                 .currency("PLN")
                 .nature(nature)
                 .build();
+    }
+
+    private static Transaction leg(Long id, Long statementId, UUID group) {
+        return Transaction.builder()
+                .id(id)
+                .statementId(statementId)
+                .accountId(statementId)
+                .transactionDate(LocalDate.of(2026, 8, 1))
+                .amount(new BigDecimal("-10"))
+                .currency("PLN")
+                .nature(TransactionNature.TRANSFER)
+                .transferGroupId(group)
+                .build();
+    }
+
+    private static BankStatement statement(Long id) {
+        return BankStatement.builder().id(id).accountId(id).bank("PEKAO").fileHash("h-" + id).build();
     }
 
     @Test
@@ -109,5 +129,51 @@ class TransactionEditServiceTest {
         assertThat(legs).hasSize(2);
         assertThat(legs).allSatisfy(leg -> assertThat(leg.getNature()).isEqualTo(TransactionNature.TRANSFER));
         assertThat(legs.get(0).getTransferGroupId()).isEqualTo(legs.get(1).getTransferGroupId()).isNotNull();
+    }
+
+    @Test
+    void deleteStatementRemovesItsRowsAndTheStatement() {
+        BankStatement statement = statement(2L);
+        Transaction row = transaction(7L, 2L, new BigDecimal("-10"), TransactionNature.EXPENSE)
+                .toBuilder().statementId(2L).build();
+        when(statements.findById(2L)).thenReturn(Optional.of(statement));
+        when(transactions.findByStatementId(2L)).thenReturn(List.of(row));
+
+        int deleted = service.deleteStatement(2L);
+
+        assertThat(deleted).isEqualTo(1);
+        verify(transactions).deleteAll(List.of(row));
+        verify(statements).deleteById(2L);
+    }
+
+    @Test
+    void deleteStatementUnpairsSurvivingTransferLeg() {
+        BankStatement statement = statement(2L);
+        UUID group = UUID.randomUUID();
+        Transaction doomedLeg = leg(7L, 2L, group);
+        Transaction survivingLeg = leg(8L, 3L, group);
+        when(statements.findById(2L)).thenReturn(Optional.of(statement));
+        when(transactions.findByStatementId(2L)).thenReturn(List.of(doomedLeg));
+        when(transactions.findByTransferGroupIds(List.of(group))).thenReturn(List.of(doomedLeg, survivingLeg));
+        when(transactions.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.deleteStatement(2L);
+
+        org.mockito.ArgumentCaptor<Transaction> captor =
+                org.mockito.ArgumentCaptor.forClass(Transaction.class);
+        verify(transactions).save(captor.capture());
+        Transaction unpairCall = captor.getValue();
+        assertThat(unpairCall.getTransferGroupId()).isNull();
+        assertThat(unpairCall.getNature()).isEqualTo(TransactionNature.EXPENSE);
+    }
+
+    @Test
+    void deleteStatementRejectsUnknownStatement() {
+        when(statements.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteStatement(99L))
+                .isInstanceOf(com.financedashboard.application.exception.NotFoundException.class);
+
+        verify(transactions, org.mockito.Mockito.never()).findByStatementId(any());
     }
 }
