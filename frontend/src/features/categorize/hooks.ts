@@ -86,6 +86,15 @@ export function useDeleteMerchantRule() {
   })
 }
 
+/** Applies one default to the uncategorized rows that match its counterparty. */
+export function useApplyMerchantRule() {
+  const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
+  return useMutation({
+    mutationFn: (id: number) => merchantRulesApi.applyOne(id),
+    onSuccess: invalidate,
+  })
+}
+
 /** Applies all defaults to the uncategorized history. */
 export function useApplyMerchantRules() {
   const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)

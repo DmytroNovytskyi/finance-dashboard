@@ -4,7 +4,6 @@ import Delete from '@mui/icons-material/Delete'
 import PlayArrow from '@mui/icons-material/PlayArrow'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
@@ -14,25 +13,26 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { uncategorizedColor, useScheme } from '../../theme'
-import { useApplyMerchantRules, useCreateMerchantRule, useDeleteMerchantRule, useMerchantRules } from './hooks'
+import { useApplyMerchantRule, useCreateMerchantRule, useDeleteMerchantRule, useMerchantRules } from './hooks'
 
 interface MerchantDefaultsProps {
   categories: CategoryPresentation[]
 }
 
-/** Lists merchant→category defaults and applies them to the uncategorized history. */
+/** Lists merchant→category defaults and lets each be applied to matching uncategorized rows. */
 export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const scheme = useScheme()
   const rules = useMerchantRules()
   const create = useCreateMerchantRule()
   const remove = useDeleteMerchantRule()
-  const apply = useApplyMerchantRules()
+  const applyOne = useApplyMerchantRule()
 
   const [merchant, setMerchant] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
   const categoryById = new Map(categories.map((category) => [category.id, category]))
+  const selectedCategory = categoryId !== '' ? categoryById.get(Number(categoryId)) : undefined
 
   const save = () => {
     if (!merchant.trim() || categoryId === '') return
@@ -41,31 +41,26 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
     setCategoryId('')
   }
 
-  const mutationError = (create.error ?? apply.error) as Error | null
-
-  const runApply = async () => {
+  const runApply = async (id: number, label: string) => {
     try {
-      const result = await apply.mutateAsync()
-      setNotice(`Applied ${result.applied} transaction${result.applied === 1 ? '' : 's'}.`)
+      const result = await applyOne.mutateAsync(id)
+      setNotice(`Applied ${label} to ${result.applied} uncategorized row${result.applied === 1 ? '' : 's'}.`)
     } catch {
       // error surfaced by the alert above
     }
   }
 
+  const mutationError = (create.error ?? applyOne.error) as Error | null
+
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h6" component="h3">
-            Defaults by counterparty
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Auto-tag future imports; apply to history manually.
-          </Typography>
-        </Box>
-        <Button size="small" startIcon={<PlayArrow />} onClick={runApply} disabled={apply.isPending}>
-          Apply to uncategorized
-        </Button>
+      <Box>
+        <Typography variant="h6" component="h3">
+          Defaults by counterparty
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Auto-tag future imports. Apply each default to its matching history.
+        </Typography>
       </Box>
 
       {mutationError ? <Alert severity="error">{mutationError.message}</Alert> : null}
@@ -86,12 +81,17 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
             return (
               <Box key={rule.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}>
                 <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
-                <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {rule.merchant}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  → {category?.name ?? `Category ${rule.categoryId}`}
-                </Typography>
+                <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Typography variant="body2" noWrap title={rule.merchant}>
+                    {rule.merchant}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {category?.name ?? `Category ${rule.categoryId}`}
+                  </Typography>
+                </Box>
+                <IconButton size="small" title="Apply to matching history" onClick={() => runApply(rule.id, rule.merchant)} aria-label={`Apply default for ${rule.merchant}`}>
+                  <PlayArrow fontSize="small" />
+                </IconButton>
                 <IconButton size="small" onClick={() => remove.mutate(rule.id)} aria-label={`Delete default for ${rule.merchant}`}>
                   <Delete fontSize="small" />
                 </IconButton>
@@ -114,7 +114,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           displayEmpty
           value={categoryId}
           onChange={(event) => setCategoryId(String(event.target.value))}
-          renderValue={() => (categoryId === '' ? 'Category…' : '')}
+          renderValue={() => selectedCategory?.name ?? 'Category…'}
           sx={{ minWidth: 150 }}
         >
           {categories.map((category) => (
@@ -123,17 +123,12 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
             </MenuItem>
           ))}
         </Select>
-        <Button size="small" variant="contained" startIcon={<Add />} onClick={save} disabled={!merchant.trim() || categoryId === '' || create.isPending}>
-          Add
-        </Button>
+        <IconButton onClick={save} disabled={!merchant.trim() || categoryId === '' || create.isPending} aria-label="Add default" color="primary">
+          <Add />
+        </IconButton>
       </Box>
 
-      <Snackbar
-        open={notice !== null}
-        autoHideDuration={4000}
-        onClose={() => setNotice(null)}
-        message={notice}
-      />
+      <Snackbar open={notice !== null} autoHideDuration={4000} onClose={() => setNotice(null)} message={notice} />
     </Paper>
   )
 }

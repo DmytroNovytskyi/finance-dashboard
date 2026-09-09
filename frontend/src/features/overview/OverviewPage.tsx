@@ -17,7 +17,7 @@ import { rangeForPreset, type DateRange, type DateRangePreset } from '../../lib/
 import { amountColor, useScheme } from '../../theme'
 import { formatInteger, formatMoney, formatMoneyMagnitude, formatTrendBucket } from '../../lib/format'
 import { ChartCard } from '../../components/ChartCard'
-import type { StatisticsGranularity, StatisticsTrendPoint } from '../../types'
+import type { StatisticsGranularity, StatisticsTrendPoint, TransactionNature } from '../../types'
 import { CategoryDonut, type DonutRow } from './CategoryDonut'
 import { PeriodSelector } from './PeriodSelector'
 import { TopMerchantsChart } from './TopMerchantsChart'
@@ -105,7 +105,7 @@ export function OverviewPage() {
   const colors = amountColor[scheme]
   const loading = trendQuery.isLoading || (overviewQuery.isLoading && !overviewQuery.data)
 
-  const openTransactions = (filters: { categoryId?: number; uncategorized?: boolean }) => {
+  const openTransactions = (filters: { categoryId?: number; uncategorized?: boolean; nature?: TransactionNature }) => {
     const query = buildQuery({
       from: overviewRange.from ?? undefined,
       to: overviewRange.to ?? undefined,
@@ -181,10 +181,10 @@ export function OverviewPage() {
           {totals ? (
             <>
               <Grid size={{ xs: 6, md: 4, lg: 2 }}>
-                <KpiTile label="Spend" value={formatMoneyMagnitude(totals.expense, baseCurrency)} color={colors.expense} onClick={() => openTransactions({})} />
+                <KpiTile label="Spend" value={formatMoneyMagnitude(totals.expense, baseCurrency)} color={colors.expense} onClick={() => openTransactions({ nature: 'EXPENSE' })} />
               </Grid>
               <Grid size={{ xs: 6, md: 4, lg: 2 }}>
-                <KpiTile label="Income" value={formatMoneyMagnitude(totals.income, baseCurrency)} color={colors.income} />
+                <KpiTile label="Income" value={formatMoneyMagnitude(totals.income, baseCurrency)} color={colors.income} onClick={() => openTransactions({ nature: 'INCOME' })} />
               </Grid>
               <Grid size={{ xs: 6, md: 4, lg: 2 }}>
                 <KpiTile label="Net" value={formatMoney(totals.net, baseCurrency)} color={totals.net >= 0 ? colors.income : colors.expense} />

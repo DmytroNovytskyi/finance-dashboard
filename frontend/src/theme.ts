@@ -1,39 +1,39 @@
 import { createTheme, useColorScheme } from '@mui/material/styles'
 
 /**
- * Warm, muted look. Chart categorical slots fall back to this set when a category has no color of
- * its own; charts always carry a labeled legend/list as the secondary encoding channel.
+ * Dark-leaning charcoal look with a muted indigo accent. Charts always carry a labeled
+ * legend/list as the identity channel alongside the categorical colors.
  */
 
 export type Scheme = 'light' | 'dark'
 
 /** Categorical slots, used to color a category that has no color of its own. */
 export const categoricalPalette: Record<Scheme, string[]> = {
-  light: ['#c4552d', '#3f8f86', '#d9a538', '#7d5ba6', '#5b9a53', '#c2657c', '#4f7fb0', '#9a6b4a'],
-  dark: ['#d4693d', '#3f9d93', '#e0a63e', '#a07bc4', '#7fae64', '#dd7f94', '#6f9bc7', '#bd8f6a'],
+  light: ['#5b78c9', '#2f9c8f', '#c79b3f', '#b24f6e', '#8a63a8', '#d0654f', '#4d8f68', '#5aa0c9'],
+  dark: ['#6f8ad4', '#38a89b', '#d2a94e', '#c25c79', '#9a74ba', '#dc735e', '#57a077', '#66aed2'],
 }
 
 /** Color reserved for the "(uncategorized)" bucket. */
 export const uncategorizedColor: Record<Scheme, string> = {
-  light: '#8a857d',
-  dark: '#9a958d',
+  light: '#8a9099',
+  dark: '#9aa3ae',
 }
 
 /** Text colors for income (money in) and expense (money out) amounts. */
 export const amountColor: Record<Scheme, { income: string; expense: string }> = {
-  light: { income: '#1e7d3e', expense: '#bf3a2a' },
-  dark: { income: '#5fbf77', expense: '#ef7a64' },
+  light: { income: '#1f7a4d', expense: '#a93a35' },
+  dark: { income: '#2e8a5f', expense: '#b34943' },
 }
 
 /** Surfaces and ink used for chart chrome (axes, grid, tooltip text). */
 export const chartInk: Record<Scheme, { grid: string; axis: string; textSecondary: string }> = {
-  light: { grid: '#e6e0d3', axis: '#c9bfad', textSecondary: '#6b6253' },
-  dark: { grid: '#33302a', axis: '#4a453c', textSecondary: '#c9c0b0' },
+  light: { grid: '#e1e6ec', axis: '#c6cdd7', textSecondary: '#5f6875' },
+  dark: { grid: '#2a303a', axis: '#464e5a', textSecondary: '#b7c0cd' },
 }
 
 const baseColors = {
-  light: { page: '#f7f3ec', surface: '#fdfaf5', primary: '#9e4b28' },
-  dark: { page: '#14120f', surface: '#201c17', primary: '#e08a5e' },
+  light: { page: '#f2f4f7', surface: '#fbfcfe', primary: '#4558a8' },
+  dark: { page: '#111318', surface: '#1c2027', primary: '#6c7ee0' },
 }
 
 export const theme = createTheme({

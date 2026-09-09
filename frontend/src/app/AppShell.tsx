@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import AccountBalanceWallet from '@mui/icons-material/AccountBalanceWallet'
+import AccountBox from '@mui/icons-material/AccountBox'
 import Dashboard from '@mui/icons-material/Dashboard'
 import Menu from '@mui/icons-material/Menu'
 import ReceiptLong from '@mui/icons-material/ReceiptLong'
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { to: '/transactions', label: 'Transactions', icon: ReceiptLong, end: false },
   { to: '/categorize', label: 'Categorize', icon: Sell, end: false },
   { to: '/import', label: 'Import', icon: UploadFile, end: false },
+  { to: '/accounts', label: 'Accounts', icon: AccountBox, end: false },
 ]
 
 /** Renders the responsive navigation shell around the routed page content. */

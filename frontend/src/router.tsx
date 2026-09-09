@@ -10,6 +10,7 @@ const TransactionsPage = lazy(() =>
 )
 const CategorizePage = lazy(() => import('./features/categorize/CategorizePage').then((module) => ({ default: module.CategorizePage })))
 const ImportPage = lazy(() => import('./features/import/ImportPage').then((module) => ({ default: module.ImportPage })))
+const AccountsPage = lazy(() => import('./features/accounts/AccountsPage').then((module) => ({ default: module.AccountsPage })))
 
 /** Declarative route table; pages are lazy-loaded so charts stay out of the initial bundle. */
 export function AppRoutes() {
@@ -27,6 +28,7 @@ export function AppRoutes() {
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="categorize" element={<CategorizePage />} />
           <Route path="import" element={<ImportPage />} />
+          <Route path="accounts" element={<AccountsPage />} />
         </Route>
       </Routes>
     </Suspense>

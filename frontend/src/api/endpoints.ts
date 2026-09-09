@@ -38,8 +38,19 @@ export interface CategoryInput {
   color?: string | null
 }
 
+export interface AccountInput {
+  name: string
+  currency: string
+  kind?: Account['kind']
+  accountNumber?: string | null
+}
+
 export const accountsApi = {
   list: () => request<Account[]>('/accounts'),
+  create: (input: AccountInput) =>
+    request<Account>('/accounts', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: number, input: Partial<AccountInput>) =>
+    request<Account>(`/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
 }
 
 export const categoriesApi = {
@@ -90,4 +101,5 @@ export const merchantRulesApi = {
     request<MerchantRule>('/merchant-rules', { method: 'POST', body: JSON.stringify(input) }),
   remove: (id: number) => request<void>(`/merchant-rules/${id}`, { method: 'DELETE' }),
   apply: () => request<{ applied: number }>('/merchant-rules/apply', { method: 'POST' }),
+  applyOne: (id: number) => request<{ applied: number }>(`/merchant-rules/${id}/apply`, { method: 'POST' }),
 }

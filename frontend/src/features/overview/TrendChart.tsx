@@ -50,7 +50,7 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
   }
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={2}>
+      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={2} barCategoryGap={6}>
         <CartesianGrid vertical={false} stroke={ink.grid} />
         <XAxis
           dataKey="start"
@@ -72,10 +72,9 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
           dataKey="income"
           name="Income"
           fill={colors.income}
-          maxBarSize={22}
           radius={[4, 4, 0, 0]}
-          onClick={(_entry, index) => {
-            const point = data[index]
+          onClick={(bar) => {
+            const point = bar.payload as StatisticsTrendPoint | undefined
             if (point) onSelect(point)
           }}
         />
@@ -83,10 +82,9 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
           dataKey="expense"
           name="Expense"
           fill={colors.expense}
-          maxBarSize={22}
           radius={[4, 4, 0, 0]}
-          onClick={(_entry, index) => {
-            const point = data[index]
+          onClick={(bar) => {
+            const point = bar.payload as StatisticsTrendPoint | undefined
             if (point) onSelect(point)
           }}
         />

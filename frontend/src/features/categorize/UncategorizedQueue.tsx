@@ -111,43 +111,60 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
         </ToggleButtonGroup>
       </Box>
 
-      {selected.size > 0 ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', bgcolor: 'action.selected', borderRadius: 2, px: 2, py: 1 }}>
-          <Typography variant="body2" sx={{ mr: 'auto' }}>
-            {selected.size} selected
+      <Box
+        sx={{
+          minHeight: 44,
+          px: 2,
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          flexWrap: 'wrap',
+          bgcolor: selected.size > 0 ? 'action.selected' : 'transparent',
+        }}
+      >
+        {selected.size > 0 ? (
+          <>
+            <Typography variant="body2" sx={{ mr: 'auto' }}>
+              {selected.size} selected
+            </Typography>
+            {single && merchant ? (
+              <FormControlLabel
+                control={
+                  <Checkbox size="small" checked={remember} disabled={hasRule} onChange={(event) => setRemember(event.target.checked)} />
+                }
+                label={
+                  <Typography variant="body2" color={hasRule ? 'text.disabled' : 'text.secondary'}>
+                    {hasRule ? 'Already has a default' : `Remember ${merchant.slice(0, 40)}`}
+                  </Typography>
+                }
+                sx={{ m: 0 }}
+              />
+            ) : null}
+            <Select
+              size="small"
+              displayEmpty
+              value=""
+              onChange={(event) => assignMany(Number(event.target.value))}
+              renderValue={() => 'Assign category…'}
+              sx={{ minWidth: 200 }}
+            >
+              {categories.map((category) => (
+                <MenuItem key={category.id} value={String(category.id)}>
+                  {category.name}
+                </MenuItem>
+              ))}
+            </Select>
+            <Button size="small" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+          </>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Select rows to assign a category in bulk.
           </Typography>
-          {single && merchant ? (
-            <FormControlLabel
-              control={
-                <Checkbox size="small" checked={remember} disabled={hasRule} onChange={(event) => setRemember(event.target.checked)} />
-              }
-              label={
-                <Typography variant="body2" color={hasRule ? 'text.disabled' : 'text.secondary'}>
-                  {hasRule ? 'Already has a default' : `Remember ${merchant.slice(0, 40)}`}
-                </Typography>
-              }
-              sx={{ m: 0 }}
-            />
-          ) : null}
-          <Select
-            size="small"
-            displayEmpty
-            value=""
-            onChange={(event) => assignMany(Number(event.target.value))}
-            renderValue={() => 'Assign category…'}
-            sx={{ minWidth: 200 }}
-          >
-            {categories.map((category) => (
-              <MenuItem key={category.id} value={String(category.id)}>
-                {category.name}
-              </MenuItem>
-            ))}
-          </Select>
-          <Button size="small" onClick={() => setSelected(new Set())}>
-            Clear
-          </Button>
-        </Box>
-      ) : null}
+        )}
+      </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
         <Checkbox

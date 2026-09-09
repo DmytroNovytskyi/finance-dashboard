@@ -100,7 +100,11 @@ export function TransactionTable({ data, accounts, categories, page, size, onPag
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {category ? (
+                        {transaction.nature === 'TRANSFER' ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Transfer
+                          </Typography>
+                        ) : category ? (
                           <>
                             <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: category.color, flexShrink: 0 }} />
                             <Typography variant="body2">{category.name}</Typography>
