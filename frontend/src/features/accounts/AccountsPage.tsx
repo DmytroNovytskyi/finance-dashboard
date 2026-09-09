@@ -9,17 +9,22 @@ import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
-import Grid from '@mui/material/Grid'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import Snackbar from '@mui/material/Snackbar'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { accountsApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
-import type { Account, AccountKind } from '../../types'
+import type { AccountKind } from '../../types'
 
 const KIND_OPTIONS: { value: AccountKind; label: string }[] = [
   { value: 'PERSONAL', label: 'Personal' },
@@ -33,7 +38,7 @@ interface AccountForm {
   accountNumber: string
 }
 
-/** Lets the user see each account, set its personal/business type, and add new ones. */
+/** List accounts and let the user set each one's personal/business type or add new ones. */
 export function AccountsPage() {
   const queryClient = useQueryClient()
   const accounts = useQuery({ queryKey: queryKeys.accounts, queryFn: accountsApi.list })
@@ -75,7 +80,8 @@ export function AccountsPage() {
   })
 
   const mutationError = (setKind.error ?? saveAccount.error) as Error | null
-  const untyped = (accounts.data ?? []).filter((account) => account.kind === null)
+  const rows = accounts.data ?? []
+  const untyped = rows.filter((account) => account.kind === null)
 
   const submit = () => {
     if (!editor || !editor.name.trim()) return
@@ -113,25 +119,64 @@ export function AccountsPage() {
 
       {mutationError ? <Alert severity="error">{mutationError.message}</Alert> : null}
 
-      <Grid container spacing={2}>
-        {(accounts.data ?? []).map((account) => (
-          <Grid key={account.id} size={{ xs: 12, md: 6, xl: 4 }}>
-            <AccountRow
-              account={account}
-              onSetKind={(kind) => setKind.mutate({ id: account.id, kind })}
-              onEdit={() => {
-                setEditingId(account.id)
-                setEditor({ name: account.name, currency: account.currency, kind: account.kind, accountNumber: account.accountNumber ?? '' })
-              }}
-            />
-          </Grid>
-        ))}
-        {(accounts.data ?? []).length === 0 && !accounts.isLoading ? (
-          <Grid size={12}>
-            <Typography color="text.secondary">No accounts yet. Create one to start importing.</Typography>
-          </Grid>
-        ) : null}
-      </Grid>
+      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Account</TableCell>
+                <TableCell sx={{ width: 110 }}>Currency</TableCell>
+                <TableCell sx={{ width: 200 }}>Type</TableCell>
+                <TableCell>Account number</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.length === 0 && !accounts.isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                      No accounts yet. Create one to start importing.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((account) => (
+                  <TableRow key={account.id} hover>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {account.name}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setEditingId(account.id)
+                            setEditor({ name: account.name, currency: account.currency, kind: account.kind, accountNumber: account.accountNumber ?? '' })
+                          }}
+                          aria-label={`Edit ${account.name}`}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{account.currency}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <KindSelect value={account.kind} onChange={(kind) => setKind.mutate({ id: account.id, kind })} />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color={account.accountNumber ? 'text.secondary' : 'text.disabled'}>
+                        {account.accountNumber ?? '—'}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       <Dialog open={editor !== null} onClose={() => setEditor(null)} maxWidth="xs" fullWidth>
         <DialogTitle>{editingId === null ? 'New account' : 'Edit account'}</DialogTitle>
@@ -175,45 +220,6 @@ export function AccountsPage() {
   )
 }
 
-function AccountRow({
-  account,
-  onSetKind,
-  onEdit,
-}: {
-  account: Account
-  onSetKind: (kind: AccountKind | null) => void
-  onEdit: () => void
-}) {
-  const label = account.kind === 'BUSINESS' ? 'Business' : account.kind === 'PERSONAL' ? 'Personal' : 'No type'
-  return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography variant="body1" sx={{ fontWeight: 600, flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {account.name}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {account.currency}
-        </Typography>
-        <IconButton size="small" onClick={onEdit} aria-label={`Edit ${account.name}`}>
-          <Edit fontSize="small" />
-        </IconButton>
-      </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <KindSelect value={account.kind} onChange={onSetKind} />
-        {account.kind === null ? (
-          <Typography variant="caption" color="text.secondary">
-            {label}
-          </Typography>
-        ) : (
-          <Typography variant="caption" color="text.secondary">
-            {account.accountNumber || 'no number'}
-          </Typography>
-        )}
-      </Box>
-    </Paper>
-  )
-}
-
 function KindSelect({ value, onChange }: { value: AccountKind | null; onChange: (kind: AccountKind | null) => void }) {
   return (
     <Select
@@ -222,7 +228,7 @@ function KindSelect({ value, onChange }: { value: AccountKind | null; onChange: 
       value={value ?? ''}
       onChange={(event) => onChange((event.target.value as AccountKind | '') || null)}
       renderValue={() => (value === null ? 'No type' : value === 'PERSONAL' ? 'Personal' : 'Business')}
-      sx={{ minWidth: 140 }}
+      sx={{ minWidth: 150 }}
     >
       <MenuItem value="">No type</MenuItem>
       {KIND_OPTIONS.map((option) => (

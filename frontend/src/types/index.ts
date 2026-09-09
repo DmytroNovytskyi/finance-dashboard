@@ -37,6 +37,8 @@ export interface Category {
   name: string
   color: string | null
   sortOrder: number
+  /** Reserved categories (e.g. "Transfer") cannot be deleted. */
+  system: boolean
 }
 
 export interface Transaction {

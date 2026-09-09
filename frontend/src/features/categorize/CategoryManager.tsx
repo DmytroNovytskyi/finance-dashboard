@@ -12,6 +12,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { useCreateCategory, useDeleteCategory, useUpdateCategory } from './hooks'
@@ -98,9 +99,13 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             >
               {category.name}
             </Typography>
-            <IconButton size="small" onClick={() => setConfirmDelete({ id: category.id, name: category.name })} aria-label={`Delete ${category.name}`}>
-              <Delete fontSize="small" />
-            </IconButton>
+            <Tooltip title={category.system ? 'Required — cannot be deleted' : `Delete ${category.name}`}>
+              <span>
+                <IconButton size="small" disabled={category.system} onClick={() => setConfirmDelete({ id: category.id, name: category.name })} aria-label={`Delete ${category.name}`}>
+                  <Delete fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
         ))}
       </Box>

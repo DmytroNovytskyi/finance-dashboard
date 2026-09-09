@@ -14,6 +14,7 @@ export interface CategoryPresentation {
   id: number
   name: string
   color: string
+  system: boolean
 }
 
 /** Categories in display order (sortOrder, then name), each with a resolved color. */
@@ -31,6 +32,7 @@ function orderCategories(categories: Category[], scheme: 'light' | 'dark'): Cate
     id: category.id,
     name: category.name,
     color: category.color ?? categoricalPalette[scheme][index % categoricalPalette[scheme].length],
+    system: category.system,
   }))
 }
 

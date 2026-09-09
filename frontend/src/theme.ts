@@ -21,8 +21,8 @@ export const uncategorizedColor: Record<Scheme, string> = {
 
 /** Text colors for income (money in) and expense (money out) amounts. */
 export const amountColor: Record<Scheme, { income: string; expense: string }> = {
-  light: { income: '#1f7a4d', expense: '#a93a35' },
-  dark: { income: '#2e8a5f', expense: '#b34943' },
+  light: { income: '#2b8f62', expense: '#b95948' },
+  dark: { income: '#4bb184', expense: '#d67a68' },
 }
 
 /** Surfaces and ink used for chart chrome (axes, grid, tooltip text). */
