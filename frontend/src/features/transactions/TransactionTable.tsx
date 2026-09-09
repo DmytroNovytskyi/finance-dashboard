@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box'
-import Chip from '@mui/material/Chip'
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -81,12 +80,7 @@ export function TransactionTable({ data, accounts, categories, page, size, onPag
                       {formatDate(transaction.transactionDate)}
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                        <Typography variant="body2">{transaction.description || transaction.merchant || '—'}</Typography>
-                        {transaction.nature === 'TRANSFER' ? (
-                          <Chip label="Transfer" size="small" variant="outlined" color="info" />
-                        ) : null}
-                      </Box>
+                      <Typography variant="body2">{transaction.description || transaction.merchant || '—'}</Typography>
                       {transaction.merchant && transaction.merchant !== transaction.description ? (
                         <Typography variant="caption" color="text.secondary">
                           {transaction.merchant}
@@ -102,7 +96,7 @@ export function TransactionTable({ data, accounts, categories, page, size, onPag
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {transaction.nature === 'TRANSFER' && !category ? (
                           <Typography variant="body2" color="text.secondary">
-                            Transfer
+                            Internal Transfer
                           </Typography>
                         ) : category ? (
                           <>

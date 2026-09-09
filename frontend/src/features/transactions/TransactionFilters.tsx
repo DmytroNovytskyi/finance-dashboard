@@ -77,7 +77,7 @@ export function TransactionFilters({ filters, accounts, categories, onChange, on
         <MenuItem value="">All</MenuItem>
         <MenuItem value="INCOME">Income</MenuItem>
         <MenuItem value="EXPENSE">Expense</MenuItem>
-        <MenuItem value="TRANSFER">Transfer</MenuItem>
+        <MenuItem value="TRANSFER">Internal Transfer</MenuItem>
       </TextField>
       <TextField
         type="date"

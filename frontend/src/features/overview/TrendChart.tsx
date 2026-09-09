@@ -88,7 +88,7 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
             tickLine={false}
             width={46}
           />
-          <Tooltip content={<TrendTooltip baseCurrency={baseCurrency} />} cursor={{ fill: ink.grid, opacity: 0.35 }} />
+          <Tooltip content={<TrendTooltip baseCurrency={baseCurrency} />} />
           <Bar dataKey="income" name="Income" fill={colors.income} maxBarSize={16} radius={[4, 4, 0, 0]} />
           <Bar dataKey="expense" name="Expense" fill={colors.expense} maxBarSize={16} radius={[4, 4, 0, 0]} />
         </BarChart>

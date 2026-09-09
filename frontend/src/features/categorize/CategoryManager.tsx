@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Add from '@mui/icons-material/Add'
 import Delete from '@mui/icons-material/Delete'
+import Lock from '@mui/icons-material/Lock'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -12,7 +13,6 @@ import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
-import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { useCreateCategory, useDeleteCategory, useUpdateCategory } from './hooks'
@@ -79,33 +79,35 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             key={category.id}
             sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
           >
-            <Box
-              component="label"
-              sx={{ position: 'relative', width: 28, height: 28, borderRadius: '50%', bgcolor: category.color, cursor: 'pointer', flexShrink: 0, display: 'inline-block' }}
-              title="Change color"
-            >
-              <input
-                type="color"
-                value={category.color}
-                onChange={(event) => update.mutate({ id: category.id, color: event.target.value })}
-                aria-label={`Change color of ${category.name}`}
-                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-              />
-            </Box>
+            {category.system ? (
+              <Box aria-hidden sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: category.color, flexShrink: 0 }} />
+            ) : (
+              <Box
+                component="label"
+                sx={{ position: 'relative', width: 28, height: 28, borderRadius: '50%', bgcolor: category.color, cursor: 'pointer', flexShrink: 0, display: 'inline-block' }}
+                title="Change color"
+              >
+                <input
+                  type="color"
+                  value={category.color}
+                  onChange={(event) => update.mutate({ id: category.id, color: event.target.value })}
+                  aria-label={`Change color of ${category.name}`}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+                />
+              </Box>
+            )}
             <Typography
               variant="body2"
-              onClick={() => openEdit(category)}
-              sx={{ flexGrow: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              onClick={category.system ? undefined : () => openEdit(category)}
+              sx={{ flexGrow: 1, minWidth: 0, cursor: category.system ? 'default' : 'pointer', '&:hover': category.system ? {} : { textDecoration: 'underline' } }}
             >
               {category.name}
             </Typography>
-            <Tooltip title={category.system ? 'Required — cannot be deleted' : `Delete ${category.name}`}>
-              <span>
-                <IconButton size="small" disabled={category.system} onClick={() => setConfirmDelete({ id: category.id, name: category.name })} aria-label={`Delete ${category.name}`}>
-                  <Delete fontSize="small" />
-                </IconButton>
-              </span>
-            </Tooltip>
+            {category.system ? <Lock fontSize="small" sx={{ color: 'text.disabled' }} aria-label="System category" /> : (
+              <IconButton size="small" onClick={() => setConfirmDelete({ id: category.id, name: category.name })} aria-label={`Delete ${category.name}`}>
+                <Delete fontSize="small" />
+              </IconButton>
+            )}
           </Box>
         ))}
       </Box>

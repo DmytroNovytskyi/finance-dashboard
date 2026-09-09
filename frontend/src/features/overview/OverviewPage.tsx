@@ -196,12 +196,7 @@ export function OverviewPage() {
                 <KpiTile label="Transactions" value={formatInteger(totals.count)} />
               </Grid>
               <Grid size={{ xs: 6, md: 4, lg: 2 }}>
-                <KpiTile
-                  label="Uncategorized"
-                  value={formatInteger(totals.uncategorizedCount)}
-                  color={totals.uncategorizedCount > 0 ? '#c0392b' : colors.income}
-                  onClick={() => navigate('/categorize')}
-                />
+                <KpiTile label="Uncategorized" value={formatInteger(totals.uncategorizedCount)} onClick={() => navigate('/categorize')} />
               </Grid>
             </>
           ) : (

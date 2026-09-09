@@ -196,20 +196,28 @@ export function AccountsPage() {
               onChange={(event) => setEditor({ ...(editor as AccountForm), currency: event.target.value.toUpperCase().slice(0, 3) })}
               fullWidth
               size="small"
+              disabled={editingId !== null}
+              helperText={editingId !== null ? 'Set when the account is created; not editable afterwards.' : 'Set at creation — it comes from the statements of this account.'}
             />
             <KindSelect value={editor?.kind ?? null} onChange={(kind) => setEditor({ ...(editor as AccountForm), kind })} />
             <TextField
-              label="Account number (optional)"
+              label="Account number (IBAN)"
               value={editor?.accountNumber ?? ''}
               onChange={(event) => setEditor({ ...(editor as AccountForm), accountNumber: event.target.value })}
               fullWidth
               size="small"
+              required
+              helperText={editor?.accountNumber.trim() ? undefined : 'Required — used to identify the account.'}
             />
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditor(null)}>Cancel</Button>
-          <Button variant="contained" onClick={submit} disabled={!editor?.name.trim() || saveAccount.isPending}>
+          <Button
+            variant="contained"
+            onClick={submit}
+            disabled={!editor?.name.trim() || !editor?.currency.trim() || !editor?.accountNumber.trim() || saveAccount.isPending}
+          >
             Save
           </Button>
         </DialogActions>
