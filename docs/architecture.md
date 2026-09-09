@@ -32,8 +32,8 @@ Defined in `domain/port`:
 
 `application` exposes orchestration classes such as `ImportStatementUseCase`,
 `CategorizeTransactionsUseCase`, `CategoryManagementUseCase`, `AccountManagementUseCase`,
-`TransferUseCase`, `DeleteTransactionsUseCase`, `StatisticsUseCase`. Controllers stay thin
-and delegate to these.
+`TransferUseCase`, `DeleteTransactionsUseCase`, `StatisticsUseCase`, and `MerchantRuleService`.
+Controllers stay thin and delegate to these.
 
 ## Pattern summary
 
@@ -51,13 +51,21 @@ Accounts carry a user-managed `kind` (`PERSONAL` / `BUSINESS`, set via
 `nature=TRANSFER` rows (incl. auto-detected internal transfers between the user's own accounts)
 are excluded from every statistic.
 
-Statistics: `GET /api/v1/statistics/summary?from&to[&accountId|kind][&topN]` reports period totals
-(income, expense magnitude, net = income − expense, transaction count, uncategorized count,
-average daily expense) plus the same split by month, by category (uncategorized bucketed as
-`(uncategorized)`), and top merchants. Amounts are summed in the base currency from `base_amount`;
-rows lacking a base amount (foreign currency without an import-time rate) are counted in an
-`unconverted` field rather than the money buckets. `kind` restricts to accounts tagged
+Statistics: `GET /api/v1/statistics/summary?from&to[&accountId|kind][&topN][&granularity]` reports
+period totals (income, expense magnitude, net = income − expense, transaction count, uncategorized
+count, average daily expense) plus the same split by month, by category (uncategorized bucketed as
+`(uncategorized)`), top merchants, and a `trend` of time buckets. The optional `granularity`
+(`day|week|month|quarter|year`, default `month`) selects the bucket width of the `trend`; each
+trend point carries its inclusive `start`/`end` dates. Amounts are summed in the base currency from
+`base_amount`; rows lacking a base amount (foreign currency without an import-time rate) are counted
+in an `unconverted` field rather than the money buckets. `kind` restricts to accounts tagged
 `PERSONAL`/`BUSINESS` (the informal business profit/loss view).
+
+Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}`, and
+`POST /api/v1/merchant-rules/apply`. A rule maps a counterparty (matched exactly, case- and
+spacing-insensitively) to a category; statement imports auto-tag matching fresh rows, and `apply`
+tags the already-imported uncategorized rows of that counterparty on demand. Deleting a category
+removes its rules.
 
 Statements: `POST /api/v1/statements` (multipart import for one account),
 `GET /api/v1/statements` (list, newest first, each with the count of stored transactions it

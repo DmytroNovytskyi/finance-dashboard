@@ -35,6 +35,19 @@ deleting a category sets its transactions back to uncategorized.
 A small default set (Groceries, Transport, Housing, Dining, Entertainment) is seeded on the
 first migration.
 
+## `merchant_rule`
+
+A user-managed default that auto-tags imported transactions by counterparty. Matching is exact on
+a normalized key (uppercased, whitespace collapsed); a rule applies to future imports and, on the
+`apply` action, to already-imported uncategorized rows.
+
+| column | type | notes |
+|---|---|---|
+| id | bigserial PK | |
+| merchant | varchar not null unique | normalized counterparty, e.g. `EXAMPLE MERCHANT` |
+| category_id | bigint FK → category not null | on delete cascade — deleting a category drops its rules |
+| created_at / updated_at | timestamptz | |
+
 ## `bank_statement`
 
 One imported file, attributed to exactly one account.
