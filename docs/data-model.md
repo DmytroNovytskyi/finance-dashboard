@@ -30,10 +30,13 @@ deleting a category sets its transactions back to uncategorized.
 | name | varchar not null | |
 | color | varchar null | hex, for UI |
 | sort_order | int not null default 0 | |
+| system | boolean not null default false | reserved categories cannot be deleted |
 | created_at / updated_at | timestamptz | |
 
 A small default set (Groceries, Transport, Housing, Dining, Entertainment) is seeded on the
-first migration.
+first migration. Migration V3 adds the reserved **Transfer** category (`system = true`); every
+`nature = TRANSFER` row is tagged with it (paired legs and a backfill of existing rows), so
+internal transfers read and filter as a normal, non-deletable group.
 
 ## `merchant_rule`
 

@@ -49,7 +49,8 @@ listed in the plan's REST table; see `web/controller` for the authoritative list
 Accounts carry a user-managed `kind` (`PERSONAL` / `BUSINESS`, set via
 `PATCH /api/v1/accounts/{id}`) that drives the statistics personal-vs-business split.
 `nature=TRANSFER` rows (incl. auto-detected internal transfers between the user's own accounts)
-are excluded from every statistic.
+are excluded from every statistic; they carry the reserved **Transfer** category (system rows,
+non-deletable) so they appear and filter as a normal group in the UI.
 
 Statistics: `GET /api/v1/statistics/summary?from&to[&accountId|kind][&topN][&granularity]` reports
 period totals (income, expense magnitude, net = income − expense, transaction count, uncategorized
