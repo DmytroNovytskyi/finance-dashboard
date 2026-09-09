@@ -42,6 +42,11 @@ public class MerchantRuleController {
         return new MerchantRuleApplyResponse(rules.applyToUncategorized());
     }
 
+    @PostMapping("/{id}/apply")
+    public MerchantRuleApplyResponse applyOne(@PathVariable Long id) {
+        return new MerchantRuleApplyResponse(rules.apply(id));
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {

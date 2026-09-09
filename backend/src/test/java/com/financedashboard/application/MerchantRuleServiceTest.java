@@ -136,6 +136,31 @@ class MerchantRuleServiceTest {
     }
 
     @Test
+    void applyOneRuleTagsOnlyItsMatchingRows() {
+        MerchantRule rule = MerchantRule.builder().id(5L).merchant("EXAMPLE MERCHANT").categoryId(CATEGORY).build();
+        when(rules.findById(5L)).thenReturn(Optional.of(rule));
+        when(transactions.findUncategorized()).thenReturn(List.of(
+                transaction(1L, "Example Merchant"),
+                transaction(2L, "EXAMPLE STORE")));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int applied = service.apply(5L);
+
+        assertThat(applied).isEqualTo(1);
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getCategoryId()).isEqualTo(CATEGORY);
+    }
+
+    @Test
+    void applyUnknownRuleThrowsNotFound() {
+        when(rules.findById(9L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.apply(9L))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
     void normalizeCollapsesCaseAndWhitespace() {
         assertThat(MerchantRuleService.normalize("  Example\tmerchant ")).isEqualTo("EXAMPLE MERCHANT");
         assertThat(MerchantRuleService.normalize(null)).isEmpty();

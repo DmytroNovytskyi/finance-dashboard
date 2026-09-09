@@ -4,6 +4,7 @@ import com.financedashboard.domain.merchant_rule.MerchantRule;
 import com.financedashboard.domain.port.MerchantRuleRepository;
 import com.financedashboard.infrastructure.persistence.mapper.MerchantRuleMapper;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,11 @@ public class MerchantRuleRepositoryAdapter implements MerchantRuleRepository {
     @Override
     public List<MerchantRule> findAll() {
         return mapper.toDomain(jpa.findAll());
+    }
+
+    @Override
+    public Optional<MerchantRule> findById(Long id) {
+        return jpa.findById(id).map(mapper::toDomain);
     }
 
     @Override

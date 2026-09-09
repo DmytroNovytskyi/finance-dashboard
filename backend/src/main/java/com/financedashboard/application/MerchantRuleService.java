@@ -93,6 +93,22 @@ public class MerchantRuleService {
         return changed.size();
     }
 
+    /** Applies the single rule to the uncategorized rows that match its merchant; returns the count. */
+    @Transactional
+    public int apply(Long id) {
+        MerchantRule rule = rules.findById(id)
+                .orElseThrow(() -> new NotFoundException("Merchant rule " + id + " not found"));
+        Map<String, Long> categoryByMerchant = Map.of(rule.getMerchant(), rule.getCategoryId());
+        List<Transaction> changed = transactions.findUncategorized().stream()
+                .map(transaction -> apply(transaction, categoryByMerchant))
+                .filter(transaction -> transaction != null)
+                .toList();
+        if (!changed.isEmpty()) {
+            transactions.saveAll(changed);
+        }
+        return changed.size();
+    }
+
     private static Transaction apply(Transaction transaction, Map<String, Long> categoryByMerchant) {
         String merchant = transaction.getMerchant();
         if (merchant == null || merchant.isBlank()) {

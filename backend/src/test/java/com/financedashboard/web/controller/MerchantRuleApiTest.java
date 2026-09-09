@@ -94,10 +94,17 @@ class MerchantRuleApiTest extends AbstractIntegrationTest {
     @Test
     void applyWithoutMatchesReturnsZero() throws Exception {
         long categoryId = insertCategory("Taxes");
-        createRule("No Such Merchant", categoryId);
+        long ruleId = createRule("No Such Merchant", categoryId);
 
         mockMvc.perform(post("/api/v1/merchant-rules/apply"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.applied").value(0));
+
+        mockMvc.perform(post("/api/v1/merchant-rules/{id}/apply", ruleId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applied").value(0));
+
+        mockMvc.perform(post("/api/v1/merchant-rules/999999/apply"))
+                .andExpect(status().isNotFound());
     }
 }
