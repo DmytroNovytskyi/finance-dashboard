@@ -61,11 +61,12 @@ trend point carries its inclusive `start`/`end` dates. Amounts are summed in the
 in an `unconverted` field rather than the money buckets. `kind` restricts to accounts tagged
 `PERSONAL`/`BUSINESS` (the informal business profit/loss view).
 
-Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}`, and
-`POST /api/v1/merchant-rules/apply`. A rule maps a counterparty (matched exactly, case- and
-spacing-insensitively) to a category; statement imports auto-tag matching fresh rows, and `apply`
-tags the already-imported uncategorized rows of that counterparty on demand. Deleting a category
-removes its rules.
+Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}`,
+`POST /api/v1/merchant-rules/{id}/apply` (one rule), and `POST /api/v1/merchant-rules/apply`
+(all rules). A rule maps a counterparty (matched exactly, case- and spacing-insensitively) to a
+category; statement imports auto-tag matching fresh rows, and the apply actions tag the
+already-imported uncategorized rows of that counterparty on demand. Deleting a category removes
+its rules.
 
 Statements: `POST /api/v1/statements` (multipart import for one account),
 `GET /api/v1/statements` (list, newest first, each with the count of stored transactions it
