@@ -1,4 +1,4 @@
-import { createTheme } from '@mui/material/styles'
+import { createTheme, useColorScheme } from '@mui/material/styles'
 
 /**
  * Shared visual tokens for light and dark mode. Surfaces, ink, and the categorical
@@ -65,3 +65,16 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 10 },
 })
+
+/** Resolves the active color scheme, honoring the OS preference (colorSchemeSelector: media). */
+export function useScheme(): Scheme {
+  const { mode, systemMode } = useColorScheme()
+  return (mode ?? systemMode) === 'dark' ? 'dark' : 'light'
+}
+
+/** Resolves a category's display color: its own color when set, otherwise the next palette slot. */
+export function categoryColorHex(color: string | null, index: number, scheme: Scheme): string {
+  if (color) return color
+  const palette = categoricalPalette[scheme]
+  return palette[index % palette.length]
+}
