@@ -34,6 +34,9 @@ public class CategoryEntity {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    @Column(nullable = false)
+    private boolean system;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

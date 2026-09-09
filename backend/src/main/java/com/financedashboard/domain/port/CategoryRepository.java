@@ -19,6 +19,9 @@ public interface CategoryRepository {
     /** Returns whether a category with the given id exists. */
     boolean existsById(Long id);
 
+    /** Returns the reserved system category (used for internal transfers), if present. */
+    Optional<Category> findSystemCategory();
+
     /** Deletes the category with the given id; affected transactions become uncategorized. */
     void deleteById(Long id);
 }

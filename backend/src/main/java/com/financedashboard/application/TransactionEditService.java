@@ -1,6 +1,7 @@
 package com.financedashboard.application;
 
 import com.financedashboard.application.exception.NotFoundException;
+import com.financedashboard.domain.category.Category;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.CategoryRepository;
 import com.financedashboard.domain.port.TransactionRepository;
@@ -71,10 +72,13 @@ public class TransactionEditService {
             throw new IllegalArgumentException("One of the transactions is already part of a transfer");
         }
         UUID group = UUID.randomUUID();
+        Long transferCategory = transferCategoryId();
         Transaction firstLeg = transactions.save(first.toBuilder()
-                .nature(TransactionNature.TRANSFER).transferGroupId(group).build());
+                .nature(TransactionNature.TRANSFER).transferGroupId(group)
+                .categoryId(transferCategory).build());
         Transaction secondLeg = transactions.save(second.toBuilder()
-                .nature(TransactionNature.TRANSFER).transferGroupId(group).build());
+                .nature(TransactionNature.TRANSFER).transferGroupId(group)
+                .categoryId(transferCategory).build());
         return List.of(firstLeg, secondLeg);
     }
 
@@ -130,8 +134,13 @@ public class TransactionEditService {
             transactions.save(leg.toBuilder()
                     .transferGroupId(null)
                     .nature(TransactionNature.forSignedAmount(leg.getAmount()))
+                    .categoryId(null)
                     .build());
         }
+    }
+
+    private Long transferCategoryId() {
+        return categories.findSystemCategory().map(Category::getId).orElse(null);
     }
 
     private void removeEmptyStatements(Collection<Transaction> doomed) {

@@ -45,10 +45,11 @@ public class CategoryService {
         return categories.save(updated);
     }
 
-    /** Deletes the category; its transactions become uncategorized. */
+    /** Deletes the category; its transactions become uncategorized. System categories are kept. */
     public void delete(Long id) {
-        if (!categories.existsById(id)) {
-            throw new NotFoundException("Category " + id + " not found");
+        Category current = get(id);
+        if (current.isSystem()) {
+            throw new IllegalArgumentException("Category '" + current.getName() + "' is required and cannot be deleted");
         }
         categories.deleteById(id);
     }

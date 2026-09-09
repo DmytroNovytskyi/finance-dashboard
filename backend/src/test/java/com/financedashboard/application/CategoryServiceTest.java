@@ -55,8 +55,17 @@ class CategoryServiceTest {
     }
 
     @Test
+    void deleteRejectsSystemCategory() {
+        Category system = Category.builder().id(2L).name("Transfer").system(true).build();
+        when(categories.findById(2L)).thenReturn(java.util.Optional.of(system));
+
+        assertThatThrownBy(() -> service.delete(2L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void deleteThrowsWhenCategoryMissing() {
-        when(categories.existsById(1L)).thenReturn(false);
+        when(categories.findById(1L)).thenReturn(java.util.Optional.empty());
 
         assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(NotFoundException.class);
         verify(categories, never()).deleteById(any());

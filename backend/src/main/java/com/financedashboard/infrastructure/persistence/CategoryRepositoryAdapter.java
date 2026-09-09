@@ -32,6 +32,11 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
+    public Optional<Category> findSystemCategory() {
+        return jpa.findFirstBySystemTrue().map(mapper::toDomain);
+    }
+
+    @Override
     public boolean existsById(Long id) {
         return jpa.existsById(id);
     }
