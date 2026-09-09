@@ -3,3 +3,6 @@ spring:
     url: jdbc:postgresql://localhost:5432/finance_test
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
+
+finance:
+  currencies: PLN

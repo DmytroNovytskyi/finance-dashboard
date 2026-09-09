@@ -27,6 +27,11 @@ public class BankStatementRepositoryAdapter implements BankStatementRepository {
     }
 
     @Override
+    public List<BankStatement> findByAccountId(Long accountId) {
+        return mapper.toDomain(jpa.findByAccountIdOrderByImportedAtDesc(accountId));
+    }
+
+    @Override
     public Optional<BankStatement> findById(Long id) {
         return jpa.findById(id).map(mapper::toDomain);
     }
@@ -34,6 +39,11 @@ public class BankStatementRepositoryAdapter implements BankStatementRepository {
     @Override
     public boolean existsByFileHash(String fileHash) {
         return jpa.existsByFileHash(fileHash);
+    }
+
+    @Override
+    public boolean existsByAccountId(Long accountId) {
+        return jpa.existsByAccountId(accountId);
     }
 
     @Override

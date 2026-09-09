@@ -97,16 +97,30 @@ class MerchantRuleServiceTest {
 
     @Test
     void deleteUnknownRuleThrowsNotFound() {
-        when(rules.existsById(99L)).thenReturn(false);
+        when(rules.findById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.delete(99L))
                 .isInstanceOf(NotFoundException.class);
     }
 
     @Test
-    void deleteExistingRuleRemovesIt() {
-        when(rules.existsById(3L)).thenReturn(true);
-        service.delete(3L);
+    void deleteExistingRuleRemovesItAndRevertsItsTransactions() {
+        MerchantRule rule = MerchantRule.builder().id(3L).merchant("EXAMPLE MERCHANT").categoryId(CATEGORY).build();
+        when(rules.findById(3L)).thenReturn(Optional.of(rule));
+        Transaction used = transaction(1L, "Example Merchant").toBuilder().categoryId(CATEGORY).build();
+        Transaction untouched = transaction(2L, "EXAMPLE STORE").toBuilder().categoryId(CATEGORY).build();
+        when(transactions.findCategorized()).thenReturn(List.of(used, untouched));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int reverted = service.delete(3L);
+
         verify(rules).deleteById(3L);
+        assertThat(reverted).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getId()).isEqualTo(1L);
+        assertThat(captor.getValue().get(0).getCategoryId()).isNull();
     }
 
     @Test
@@ -164,6 +178,39 @@ class MerchantRuleServiceTest {
     void normalizeCollapsesCaseAndWhitespace() {
         assertThat(MerchantRuleService.normalize("  Example\tmerchant ")).isEqualTo("EXAMPLE MERCHANT");
         assertThat(MerchantRuleService.normalize(null)).isEmpty();
+    }
+
+    @Test
+    void clearAllDeletesRulesAndRevertsTransactionsThatUsedThem() {
+        MerchantRule rule = MerchantRule.builder().id(5L).merchant("EXAMPLE MERCHANT").categoryId(CATEGORY).build();
+        when(rules.findAll()).thenReturn(List.of(rule));
+        Transaction reverted = transaction(1L, "Example Merchant").toBuilder().categoryId(CATEGORY).build();
+        Transaction otherCategory = transaction(2L, "Example Merchant").toBuilder().categoryId(9L).build();
+        Transaction otherMerchant = transaction(3L, "EXAMPLE STORE").toBuilder().categoryId(CATEGORY).build();
+        when(transactions.findCategorized()).thenReturn(List.of(reverted, otherCategory, otherMerchant));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MerchantRuleService.ClearAllResult result = service.clearAll();
+
+        verify(rules).deleteById(5L);
+        assertThat(result.rulesRemoved()).isEqualTo(1);
+        assertThat(result.transactionsUncategorized()).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getCategoryId()).isNull();
+    }
+
+    @Test
+    void clearAllWithNoRulesIsANoOp() {
+        when(rules.findAll()).thenReturn(List.of());
+
+        MerchantRuleService.ClearAllResult result = service.clearAll();
+
+        assertThat(result.rulesRemoved()).isZero();
+        assertThat(result.transactionsUncategorized()).isZero();
+        verify(transactions, never()).findCategorized();
     }
 
     private static Transaction transaction(long id, String merchant) {

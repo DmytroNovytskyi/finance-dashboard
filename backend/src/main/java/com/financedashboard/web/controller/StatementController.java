@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,9 +38,7 @@ public class StatementController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public StatementImportResponse importStatement(
-            @RequestPart("file") MultipartFile file,
-            @RequestParam("accountId") Long accountId) {
+    public StatementImportResponse importStatement(@RequestPart("file") MultipartFile file) {
         byte[] bytes;
         try {
             bytes = file.getBytes();
@@ -49,7 +46,7 @@ public class StatementController {
             throw new StatementParseException("Could not read the uploaded file", e);
         }
         return StatementImportResponse.from(importService.importStatement(
-                bytes, file.getContentType(), accountId, file.getOriginalFilename()));
+                bytes, file.getContentType(), file.getOriginalFilename()));
     }
 
     @DeleteMapping("/{id}")

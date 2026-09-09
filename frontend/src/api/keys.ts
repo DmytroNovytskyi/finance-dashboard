@@ -6,6 +6,7 @@ export const queryKeys = {
   categories: ['categories'] as const,
   merchantRules: ['merchant-rules'] as const,
   statements: ['statements'] as const,
+  transfers: ['transfers'] as const,
   transactions: {
     root: ['transactions'] as const,
     list: (params: TransactionListParams) => ['transactions', 'list', params] as const,
@@ -13,5 +14,9 @@ export const queryKeys = {
   statistics: {
     root: ['statistics'] as const,
     summary: (params: StatisticsParams) => ['statistics', 'summary', params] as const,
+    categorySeries: (categoryId: number, params: StatisticsParams) =>
+      ['statistics', 'category-series', categoryId, params] as const,
+    categoryTrend: (categoryId: number, params: StatisticsParams) =>
+      ['statistics', 'category-trend', categoryId, params] as const,
   },
 }

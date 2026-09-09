@@ -1,0 +1,8 @@
+/* Recharts gives its bars/surfaces a browser focus ring for keyboard navigation. Clicking a bar
+   to focus a period would otherwise paint a white rectangle around it, so drop the ring there. */
+.recharts-wrapper,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible,
+.recharts-surface {
+  outline: none !important;
+}

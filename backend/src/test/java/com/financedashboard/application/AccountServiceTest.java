@@ -40,6 +40,16 @@ class AccountServiceTest {
     }
 
     @Test
+    void createCanonicalizesAccountNumberToDigitsOnly() {
+        when(accounts.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Account created = service.create("Pekao", "PLN", null,
+                "PL 00 0000 0000 0000 0000 0000 0001", null);
+
+        assertThat(created.getAccountNumber()).isEqualTo("00000000000000000000000001");
+    }
+
+    @Test
     void createRejectsBlankName() {
         assertThatThrownBy(() -> service.create("   ", "PLN", null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);

@@ -3,6 +3,7 @@ package com.financedashboard.application;
 import com.financedashboard.application.exception.NotFoundException;
 import com.financedashboard.domain.account.Account;
 import com.financedashboard.domain.account.AccountKind;
+import com.financedashboard.domain.account.AccountNumbers;
 import com.financedashboard.domain.port.AccountRepository;
 import java.util.List;
 import java.util.Locale;
@@ -35,7 +36,7 @@ public class AccountService {
                 .name(requireName(name))
                 .currency(requireCurrency(currency))
                 .kind(kind)
-                .accountNumber(accountNumber)
+                .accountNumber(AccountNumbers.canonical(accountNumber))
                 .sortOrder(sortOrder == null ? 0 : sortOrder)
                 .build();
         return accounts.save(account);
@@ -48,7 +49,7 @@ public class AccountService {
                 .name(name != null ? requireName(name) : current.getName())
                 .currency(currency != null ? requireCurrency(currency) : current.getCurrency())
                 .kind(kind != null ? kind : current.getKind())
-                .accountNumber(accountNumber)
+                .accountNumber(accountNumber == null ? null : AccountNumbers.canonical(accountNumber))
                 .build();
         return accounts.save(account);
     }

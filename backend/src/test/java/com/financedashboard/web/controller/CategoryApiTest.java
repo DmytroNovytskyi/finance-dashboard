@@ -56,6 +56,33 @@ class CategoryApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void uncategorizeClearsItsTransactionsButKeepsTheCategory() throws Exception {
+        long categoryId = createCategory("Taxes", "#000000");
+        long accountId = jdbcTemplate.queryForObject(
+                "insert into account (name, currency) values ('Personal PLN', 'PLN') returning id",
+                Long.class);
+        long statementId = jdbcTemplate.queryForObject(
+                "insert into bank_statement (account_id, bank, file_hash) values (?, 'PEKAO', 'h-uncat') returning id",
+                Long.class, accountId);
+        long txId = jdbcTemplate.queryForObject("""
+                insert into transaction (statement_id, account_id, transaction_date, amount,
+                        currency, nature, description, category_id)
+                values (?, ?, date '2026-03-05', -10.00, 'PLN', 'EXPENSE', 'op', ?) returning id
+                """, Long.class, statementId, accountId, categoryId);
+
+        mockMvc.perform(post("/api/v1/categories/{id}/uncategorize", categoryId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        mockMvc.perform(get("/api/v1/categories/{id}", categoryId))
+                .andExpect(status().isOk());
+
+        Integer assigned = jdbcTemplate.queryForObject(
+                "select count(*) from transaction where id = ? and category_id is null", Integer.class, txId);
+        org.assertj.core.api.Assertions.assertThat(assigned).isEqualTo(1);
+    }
+
+    @Test
     void deleteCategoryRemovesIt() throws Exception {
         long id = createCategory("Dining", "#FF9800");
 

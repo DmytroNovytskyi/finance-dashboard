@@ -10,6 +10,8 @@ import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
 import { theme } from './theme'
 import { AppRoutes } from './router'
+import { DisplayCurrencyProvider } from './features/preferences/displayCurrency'
+import './styles.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,7 +29,9 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <CssBaseline enableColorScheme />
         <BrowserRouter>
-          <AppRoutes />
+          <DisplayCurrencyProvider>
+            <AppRoutes />
+          </DisplayCurrencyProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

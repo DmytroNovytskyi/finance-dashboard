@@ -21,7 +21,11 @@ export function useUncategorizedQueue(nature: 'EXPENSE' | 'INCOME') {
 
 /** Assigns a single transaction to a category (null clears it). */
 export function useCategorizeOne() {
-  const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
+  const invalidate = useInvalidate(
+    queryKeys.transactions.root,
+    queryKeys.statistics.root,
+    queryKeys.transfers,
+  )
   return useMutation({
     mutationFn: ({ id, categoryId }: { id: number; categoryId: number | null }) =>
       transactionsApi.update(id, { categoryId }),
@@ -31,7 +35,11 @@ export function useCategorizeOne() {
 
 /** Assigns a category to many transactions at once. */
 export function useCategorizeBulk() {
-  const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
+  const invalidate = useInvalidate(
+    queryKeys.transactions.root,
+    queryKeys.statistics.root,
+    queryKeys.transfers,
+  )
   return useMutation({
     mutationFn: ({ ids, categoryId }: { ids: number[]; categoryId: number | null }) =>
       transactionsApi.categorizeBulk(ids, categoryId),
@@ -64,6 +72,15 @@ export function useDeleteCategory() {
   })
 }
 
+/** Clears the category from its transactions, keeping the category itself. */
+export function useUncategorizeCategory() {
+  const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
+  return useMutation({
+    mutationFn: (id: number) => categoriesApi.uncategorize(id),
+    onSuccess: invalidate,
+  })
+}
+
 /** Merchant-to-category defaults. */
 export function useMerchantRules() {
   return useQuery({ queryKey: queryKeys.merchantRules, queryFn: merchantRulesApi.list })
@@ -79,7 +96,7 @@ export function useCreateMerchantRule() {
 }
 
 export function useDeleteMerchantRule() {
-  const invalidate = useInvalidate(queryKeys.merchantRules)
+  const invalidate = useInvalidate(queryKeys.merchantRules, queryKeys.transactions.root, queryKeys.statistics.root)
   return useMutation({
     mutationFn: (id: number) => merchantRulesApi.remove(id),
     onSuccess: invalidate,
@@ -100,6 +117,24 @@ export function useApplyMerchantRules() {
   const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
   return useMutation({
     mutationFn: () => merchantRulesApi.apply(),
+    onSuccess: invalidate,
+  })
+}
+
+/** Removes every default and reverts the transactions it had auto-tagged. */
+export function useClearMerchantRules() {
+  const invalidate = useInvalidate(queryKeys.merchantRules, queryKeys.transactions.root, queryKeys.statistics.root)
+  return useMutation({
+    mutationFn: () => merchantRulesApi.clearAll(),
+    onSuccess: invalidate,
+  })
+}
+
+/** Clears the category on every categorized transaction (except internal transfers). */
+export function useUncategorizeAll() {
+  const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)
+  return useMutation({
+    mutationFn: () => transactionsApi.uncategorizeAll(),
     onSuccess: invalidate,
   })
 }

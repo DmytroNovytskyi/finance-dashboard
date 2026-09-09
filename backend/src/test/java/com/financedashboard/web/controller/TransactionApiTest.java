@@ -134,6 +134,44 @@ class TransactionApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void sortsByAmountAscending() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "amount").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.content[0].description").value("Hotel night"))
+                .andExpect(jsonPath("$.content[1].description").value("Groceries run"))
+                .andExpect(jsonPath("$.content[3].description").value("Monthly salary"));
+    }
+
+    @Test
+    void sortsByCategoryNameKeepingUncategorizedRows() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "category").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.content.length()").value(4))
+                .andExpect(jsonPath("$.content[0].description").value("Groceries run"))
+                .andExpect(jsonPath("$.content[1].description").value("Pizza dinner"))
+                .andExpect(jsonPath("$.content[2].description").value("Hotel night"))
+                .andExpect(jsonPath("$.content[3].description").value("Monthly salary"));
+    }
+
+    @Test
+    void sortsByAccountName() throws Exception {
+        jdbcTemplate.update("""
+                insert into account (id, name, currency) values (2, 'Business PLN', 'PLN')
+                """);
+        jdbcTemplate.update("""
+                insert into transaction (statement_id, account_id, transaction_date, amount,
+                    currency, nature, description)
+                values (1, 2, '2026-09-02', '-5.00', 'PLN', 'EXPENSE', 'Business coffee')
+                """);
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "account").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.content[0].description").value("Business coffee"));
+    }
+
+    @Test
     void getsSingleTransaction() throws Exception {
         mockMvc.perform(get("/api/v1/transactions/{id}", txA))
                 .andExpect(status().isOk())

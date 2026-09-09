@@ -9,6 +9,7 @@ const TransactionsPage = lazy(() =>
   import('./features/transactions/TransactionsPage').then((module) => ({ default: module.TransactionsPage })),
 )
 const CategorizePage = lazy(() => import('./features/categorize/CategorizePage').then((module) => ({ default: module.CategorizePage })))
+const CategoriesPage = lazy(() => import('./features/categories/CategoriesPage').then((module) => ({ default: module.CategoriesPage })))
 const ImportPage = lazy(() => import('./features/import/ImportPage').then((module) => ({ default: module.ImportPage })))
 const AccountsPage = lazy(() => import('./features/accounts/AccountsPage').then((module) => ({ default: module.AccountsPage })))
 
@@ -27,6 +28,7 @@ export function AppRoutes() {
           <Route index element={<OverviewPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="categorize" element={<CategorizePage />} />
+          <Route path="categories" element={<CategoriesPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="accounts" element={<AccountsPage />} />
         </Route>

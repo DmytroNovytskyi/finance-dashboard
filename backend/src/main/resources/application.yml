@@ -27,6 +27,10 @@ springdoc:
 
 finance:
   base-currency: ${FINANCE_BASE_CURRENCY:PLN}
+  currencies: ${FINANCE_CURRENCIES:PLN,USD}
   fx:
     nbp:
       base-url: ${NBP_BASE_URL:https://api.nbp.pl}
+    import:
+      lookback-days: ${FX_IMPORT_LOOKBACK_DAYS:5}
+    backfill-on-startup: ${FX_BACKFILL_ON_STARTUP:false}

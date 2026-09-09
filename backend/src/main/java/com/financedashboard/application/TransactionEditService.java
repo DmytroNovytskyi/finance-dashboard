@@ -2,9 +2,11 @@ package com.financedashboard.application;
 
 import com.financedashboard.application.exception.NotFoundException;
 import com.financedashboard.domain.category.Category;
+import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.CategoryRepository;
 import com.financedashboard.domain.port.TransactionRepository;
+import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionNature;
 import java.time.LocalDate;
@@ -26,6 +28,7 @@ public class TransactionEditService {
     private final TransactionRepository transactions;
     private final CategoryRepository categories;
     private final BankStatementRepository statements;
+    private final AccountRepository accounts;
 
     /**
      * Applies a category and/or nature to one transaction. When {@code categorySpecified} the
@@ -59,6 +62,59 @@ public class TransactionEditService {
         }
     }
 
+    /**
+     * Clears the category of every categorized, non-transfer transaction (internal transfers keep
+     * their reserved tag). Returns how many rows were changed.
+     */
+    @Transactional
+    public int uncategorizeAll() {
+        List<Transaction> cleared = transactions.findCategorized().stream()
+                .map(transaction -> transaction.toBuilder().categoryId(null).build())
+                .toList();
+        if (!cleared.isEmpty()) {
+            transactions.saveAll(cleared);
+        }
+        return cleared.size();
+    }
+
+    /**
+     * Clears the category of the transactions tagged with the given category, without deleting the
+     * category. Internal transfers (which keep their reserved tag) are untouched.
+     */
+    @Transactional
+    public int uncategorizeByCategory(Long categoryId) {
+        List<Transaction> cleared = transactions.findCategorized().stream()
+                .filter(transaction -> categoryId.equals(transaction.getCategoryId()))
+                .map(transaction -> transaction.toBuilder().categoryId(null).build())
+                .toList();
+        if (!cleared.isEmpty()) {
+            transactions.saveAll(cleared);
+        }
+        return cleared.size();
+    }
+
+    /**
+     * Deletes the account with the given id and everything it holds: all of its transactions (any
+     * surviving transfer leg in another account is un-paired back to its natural nature) and its
+     * statements, then the account row itself. Returns how many transactions were removed.
+     */
+    @Transactional
+    public int deleteAccountAndTransactions(Long accountId) {
+        if (accounts.findById(accountId).isEmpty()) {
+            throw new NotFoundException("Account " + accountId + " not found");
+        }
+        List<Transaction> rows = transactions.findByAccountId(accountId);
+        unpairSurvivingTransferLegs(rows);
+        if (!rows.isEmpty()) {
+            transactions.deleteAll(rows);
+        }
+        for (BankStatement statement : statements.findByAccountId(accountId)) {
+            statements.deleteById(statement.getId());
+        }
+        accounts.deleteById(accountId);
+        return rows.size();
+    }
+
     /** Pairs two own-account transactions as one internal transfer (both legs become TRANSFER). */
     @Transactional
     public List<Transaction> pairTransfer(Long firstId, Long secondId) {
@@ -83,9 +139,47 @@ public class TransactionEditService {
     }
 
     /**
+     * Pairs two transactions as one internal transfer only when neither leg has a category yet.
+     * Returns whether the pair was applied; a categorized leg is treated as already decided and is
+     * left untouched. Used by import-time auto-pairing.
+     */
+    @Transactional
+    public boolean pairIfBothUncategorized(Long firstId, Long secondId) {
+        if (get(firstId).getCategoryId() != null || get(secondId).getCategoryId() != null) {
+            return false;
+        }
+        pairTransfer(firstId, secondId);
+        return true;
+    }
+
+    /**
+     * Reverts an internal transfer: every leg of its group becomes a normal income/expense again
+     * (nature by signed amount, category cleared, group removed). Returns the reverted legs.
+     */
+    @Transactional
+    public List<Transaction> unpairTransfer(Long transactionId) {
+        Transaction leg = get(transactionId);
+        UUID group = leg.getTransferGroupId();
+        if (group == null) {
+            throw new IllegalArgumentException("Transaction " + transactionId
+                    + " is not part of an internal transfer");
+        }
+        List<Transaction> legs = transactions.findByTransferGroupIds(List.of(group));
+        List<Transaction> reverted = legs.stream()
+                .map(t -> t.toBuilder()
+                        .transferGroupId(null)
+                        .nature(TransactionNature.forSignedAmount(t.getAmount()))
+                        .categoryId(null)
+                        .build())
+                .toList();
+        return transactions.saveAll(reverted);
+    }
+
+    /**
      * Deletes transactions in the inclusive date range (optionally one account). Statements left
-     * empty are removed so their files can be re-imported. If a transfer leg is deleted, the
-     * surviving leg is un-paired back to its natural nature.
+     * empty are removed so their files can be re-imported, and an account that ends up with no
+     * transactions or statements is removed as well. If a transfer leg is deleted, the surviving
+     * leg is un-paired back to its natural nature.
      */
     @Transactional
     public int deleteRange(LocalDate from, LocalDate to, Long accountId) {
@@ -96,17 +190,19 @@ public class TransactionEditService {
         unpairSurvivingTransferLegs(doomed);
         transactions.deleteAll(doomed);
         removeEmptyStatements(doomed);
+        removeEmptyAccounts(doomed.stream().map(Transaction::getAccountId).toList());
         return doomed.size();
     }
 
     /**
      * Deletes the statement with the given id and the transaction rows it introduced, so its file
      * can be re-imported. If one leg of a paired transfer is among those rows, the surviving leg is
-     * un-paired back to its natural nature.
+     * un-paired back to its natural nature; an account left with no transactions or statements is
+     * removed.
      */
     @Transactional
     public int deleteStatement(Long id) {
-        statements.findById(id)
+        BankStatement statement = statements.findById(id)
                 .orElseThrow(() -> new NotFoundException("Statement " + id + " not found"));
         List<Transaction> rows = transactions.findByStatementId(id);
         unpairSurvivingTransferLegs(rows);
@@ -114,6 +210,7 @@ public class TransactionEditService {
             transactions.deleteAll(rows);
         }
         statements.deleteById(id);
+        removeEmptyAccounts(List.of(statement.getAccountId()));
         return rows.size();
     }
 
@@ -151,6 +248,18 @@ public class TransactionEditService {
                 .forEach(statementId -> {
                     if (!transactions.existsByStatementId(statementId)) {
                         statements.deleteById(statementId);
+                    }
+                });
+    }
+
+    private void removeEmptyAccounts(Collection<Long> accountIds) {
+        accountIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(accountId -> {
+                    if (!transactions.existsByAccountId(accountId)
+                            && !statements.existsByAccountId(accountId)) {
+                        accounts.deleteById(accountId);
                     }
                 });
     }

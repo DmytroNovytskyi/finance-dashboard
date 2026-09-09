@@ -22,9 +22,15 @@ public interface TransactionJpaRepository
 
     List<TransactionEntity> findByCategoryIdIsNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
 
+    List<TransactionEntity> findByCategoryIdIsNotNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
+
     List<TransactionEntity> findByStatementId(Long statementId);
 
+    List<TransactionEntity> findByAccountIdOrderByTransactionDateAscIdAsc(Long accountId);
+
     boolean existsByStatementId(Long statementId);
+
+    boolean existsByAccountId(Long accountId);
 
     @Query("select t.statementId as statementId, count(t) as transactionCount "
             + "from TransactionEntity t where t.statementId in :statementIds group by t.statementId")

@@ -2,6 +2,7 @@ package com.financedashboard.web.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -79,6 +80,43 @@ class AccountApiTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Renamed"))
                 .andExpect(jsonPath("$.kind").value("BUSINESS"))
                 .andExpect(jsonPath("$.currency").value("PLN"));
+    }
+
+    @Test
+    void deleteRemovesTheAccountItsStatementsAndTransactions() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/accounts")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Personal PLN","currency":"PLN"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+        long statementId = jdbcTemplate.queryForObject(
+                "insert into bank_statement (account_id, bank, file_hash) values (?, 'PEKAO', 'h-del') returning id",
+                Long.class, id);
+        jdbcTemplate.update("""
+                insert into transaction (statement_id, account_id, transaction_date, amount,
+                        currency, nature, description)
+                values (?, ?, date '2026-03-05', -10.00, 'PLN', 'EXPENSE', 'op')
+                """, statementId, id);
+
+        mockMvc.perform(delete("/api/v1/accounts/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        assertThat((Integer) jdbcTemplate.queryForObject(
+                "select count(*) from account where id = ?", Integer.class, id)).isZero();
+        assertThat((Integer) jdbcTemplate.queryForObject(
+                "select count(*) from bank_statement where id = ?", Integer.class, statementId)).isZero();
+        assertThat((Integer) jdbcTemplate.queryForObject(
+                "select count(*) from transaction where account_id = ?", Integer.class, id)).isZero();
+    }
+
+    @Test
+    void deleteMissingAccountReturnsNotFound() throws Exception {
+        mockMvc.perform(delete("/api/v1/accounts/424242"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

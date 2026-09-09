@@ -1,6 +1,9 @@
 package com.financedashboard.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.financedashboard.application.TransferSuggestionService.SuggestedTransfer;
@@ -29,6 +32,8 @@ class TransferSuggestionServiceTest {
     private AccountRepository accounts;
     @Mock
     private TransactionRepository transactions;
+    @Mock
+    private TransactionEditService edit;
 
     @InjectMocks
     private TransferSuggestionService service;
@@ -76,6 +81,49 @@ class TransferSuggestionServiceTest {
         when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
 
         assertThat(service.suggest()).isEmpty();
+    }
+
+    @Test
+    void ignoresMirrorPairWhoseBothLegsAreCategorized() {
+        Transaction out = tx(32L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B).toBuilder().categoryId(3L).build();
+        Transaction in = tx(33L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A).toBuilder().categoryId(4L).build();
+        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+
+        assertThat(service.suggest()).isEmpty();
+    }
+
+    @Test
+    void suggestsMirrorPairWhenOnlyOneLegIsCategorized() {
+        Transaction out = tx(34L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B).toBuilder().categoryId(3L).build();
+        Transaction in = tx(35L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A);
+        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+
+        assertThat(service.suggest()).hasSize(1);
+    }
+
+    @Test
+    void autoPairsFreshMirrorLegsWhenBothUncategorized() {
+        Transaction out = tx(40L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B);
+        Transaction in = tx(41L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A);
+        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(edit.pairIfBothUncategorized(40L, 41L)).thenReturn(true);
+
+        int applied = service.autoPairForImported(List.of(41L), edit);
+
+        assertThat(applied).isEqualTo(1);
+        verify(edit).pairIfBothUncategorized(40L, 41L);
+    }
+
+    @Test
+    void doesNotAutoPairSuggestionUntouchedByTheImport() {
+        Transaction out = tx(42L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B);
+        Transaction in = tx(43L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A);
+        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+
+        int applied = service.autoPairForImported(List.of(999L), edit);
+
+        assertThat(applied).isZero();
+        verify(edit, never()).pairIfBothUncategorized(anyLong(), anyLong());
     }
 
     private static Account account(long id, String accountNumber) {

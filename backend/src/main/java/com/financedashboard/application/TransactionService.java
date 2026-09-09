@@ -5,6 +5,8 @@ import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionFilter;
+import com.financedashboard.domain.transaction.TransactionOrder;
+import com.financedashboard.domain.transaction.TransactionSortField;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,16 +16,23 @@ import org.springframework.stereotype.Service;
 public class TransactionService {
 
     private static final int DEFAULT_PAGE_SIZE = 50;
-    private static final int MAX_PAGE_SIZE = 200;
+    private static final int MAX_PAGE_SIZE = 10_000;
+    private static final TransactionOrder DEFAULT_ORDER =
+            new TransactionOrder(TransactionSortField.DATE, false);
 
     private final TransactionRepository transactions;
 
     /** Returns one page of transactions matching the filter. */
     public PagedTransactions list(TransactionFilter filter, Integer page, Integer size) {
+        return list(filter, page, size, DEFAULT_ORDER);
+    }
+
+    /** Returns one page of transactions matching the filter, ordered by {@code order}. */
+    public PagedTransactions list(TransactionFilter filter, Integer page, Integer size, TransactionOrder order) {
         int safePage = page == null ? 0 : Math.max(page, 0);
         int safeSize = size == null ? DEFAULT_PAGE_SIZE
                 : Math.min(MAX_PAGE_SIZE, Math.max(size, 1));
-        return transactions.search(filter, safePage, safeSize);
+        return transactions.search(filter, safePage, safeSize, order);
     }
 
     /** Returns the transaction with the given id. */

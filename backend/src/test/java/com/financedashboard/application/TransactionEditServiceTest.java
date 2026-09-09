@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.CategoryRepository;
 import com.financedashboard.domain.port.TransactionRepository;
@@ -32,6 +33,8 @@ class TransactionEditServiceTest {
     private CategoryRepository categories;
     @Mock
     private BankStatementRepository statements;
+    @Mock
+    private AccountRepository accounts;
 
     @InjectMocks
     private TransactionEditService service;
@@ -132,7 +135,7 @@ class TransactionEditServiceTest {
     }
 
     @Test
-    void deleteStatementRemovesItsRowsAndTheStatement() {
+    void deleteStatementRemovesItsRowsTheStatementAndAnAccountLeftEmpty() {
         BankStatement statement = statement(2L);
         Transaction row = transaction(7L, 2L, new BigDecimal("-10"), TransactionNature.EXPENSE)
                 .toBuilder().statementId(2L).build();
@@ -144,6 +147,21 @@ class TransactionEditServiceTest {
         assertThat(deleted).isEqualTo(1);
         verify(transactions).deleteAll(List.of(row));
         verify(statements).deleteById(2L);
+        verify(accounts).deleteById(2L);
+    }
+
+    @Test
+    void deleteStatementKeepsAnAccountThatStillHoldsTransactions() {
+        BankStatement statement = statement(2L);
+        Transaction row = transaction(7L, 2L, new BigDecimal("-10"), TransactionNature.EXPENSE)
+                .toBuilder().statementId(2L).build();
+        when(statements.findById(2L)).thenReturn(Optional.of(statement));
+        when(transactions.findByStatementId(2L)).thenReturn(List.of(row));
+        when(transactions.existsByAccountId(2L)).thenReturn(true);
+
+        service.deleteStatement(2L);
+
+        verify(accounts, org.mockito.Mockito.never()).deleteById(2L);
     }
 
     @Test
@@ -175,5 +193,151 @@ class TransactionEditServiceTest {
                 .isInstanceOf(com.financedashboard.application.exception.NotFoundException.class);
 
         verify(transactions, org.mockito.Mockito.never()).findByStatementId(any());
+    }
+
+    @Test
+    void deleteRangeRemovesAccountLeftWithoutStatementsOrTransactions() {
+        Transaction doomed = transaction(1L, 5L, new BigDecimal("-10"), TransactionNature.EXPENSE);
+        when(transactions.findByDateRangeAndAccount(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null))
+                .thenReturn(List.of(doomed));
+
+        int deleted = service.deleteRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null);
+
+        assertThat(deleted).isEqualTo(1);
+        verify(transactions).deleteAll(List.of(doomed));
+        verify(accounts).deleteById(5L);
+    }
+
+    @Test
+    void uncategorizeAllClearsEveryCategorizedRow() {
+        Transaction categorized = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE)
+                .toBuilder().categoryId(5L).build();
+        when(transactions.findCategorized()).thenReturn(List.of(categorized));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int cleared = service.uncategorizeAll();
+
+        assertThat(cleared).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<Transaction>> captor =
+                org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue().get(0).getCategoryId()).isNull();
+    }
+
+    @Test
+    void uncategorizeByCategoryClearsOnlyRowsOfThatCategory() {
+        Transaction inTarget = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE)
+                .toBuilder().categoryId(5L).build();
+        Transaction other = transaction(2L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE)
+                .toBuilder().categoryId(9L).build();
+        when(transactions.findCategorized()).thenReturn(List.of(inTarget, other));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int cleared = service.uncategorizeByCategory(5L);
+
+        assertThat(cleared).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<Transaction>> captor =
+                org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(Transaction::getId).containsExactly(1L);
+    }
+
+    @Test
+    void deleteAccountRemovesItsTransactionsStatementsAndTheAccount() {
+        when(accounts.findById(5L)).thenReturn(Optional.of(
+                com.financedashboard.domain.account.Account.builder().id(5L).name("A").currency("PLN").build()));
+        Transaction row = transaction(1L, 5L, new BigDecimal("-10"), TransactionNature.EXPENSE);
+        when(transactions.findByAccountId(5L)).thenReturn(List.of(row));
+        BankStatement owned = BankStatement.builder().id(2L).accountId(5L).bank("PEKAO").build();
+        when(statements.findByAccountId(5L)).thenReturn(List.of(owned));
+
+        int deleted = service.deleteAccountAndTransactions(5L);
+
+        assertThat(deleted).isEqualTo(1);
+        verify(transactions).deleteAll(List.of(row));
+        verify(statements).deleteById(2L);
+        verify(accounts).deleteById(5L);
+    }
+
+    @Test
+    void deleteAccountRejectsUnknownAccount() {
+        when(accounts.findById(5L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteAccountAndTransactions(5L))
+                .isInstanceOf(com.financedashboard.application.exception.NotFoundException.class);
+        verify(accounts, org.mockito.Mockito.never()).deleteById(any());
+    }
+
+    @Test
+    void deleteRangeKeepsAccountStillReferencedByAStatement() {
+        Transaction doomed = transaction(1L, 5L, new BigDecimal("-10"), TransactionNature.EXPENSE);
+        when(transactions.findByDateRangeAndAccount(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 5L))
+                .thenReturn(List.of(doomed));
+        when(statements.existsByAccountId(5L)).thenReturn(true);
+
+        service.deleteRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 5L);
+
+        verify(accounts, org.mockito.Mockito.never()).deleteById(5L);
+    }
+
+    @Test
+    void pairIfBothUncategorizedLeavesACategorizedLegAlone() {
+        Transaction categorized = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE)
+                .toBuilder().categoryId(5L).build();
+        when(transactions.findById(1L)).thenReturn(Optional.of(categorized));
+
+        boolean paired = service.pairIfBothUncategorized(1L, 2L);
+
+        assertThat(paired).isFalse();
+        verify(transactions, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void pairIfBothUncategorizedPairsWhenNeitherLegHasACategory() {
+        Transaction first = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE);
+        Transaction second = transaction(2L, 2L, new BigDecimal("8"), TransactionNature.INCOME);
+        when(transactions.findById(1L)).thenReturn(Optional.of(first));
+        when(transactions.findById(2L)).thenReturn(Optional.of(second));
+        when(transactions.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        boolean paired = service.pairIfBothUncategorized(1L, 2L);
+
+        assertThat(paired).isTrue();
+        verify(transactions, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    @Test
+    void unpairTransferRevertsBothLegsToTheirNaturalNature() {
+        UUID group = UUID.randomUUID();
+        Transaction negative = leg(1L, 1L, group).toBuilder().categoryId(9L).build();
+        Transaction positive = leg(2L, 2L, group).toBuilder()
+                .amount(new BigDecimal("10"))
+                .nature(TransactionNature.TRANSFER)
+                .categoryId(9L)
+                .build();
+        when(transactions.findById(1L)).thenReturn(Optional.of(negative));
+        when(transactions.findByTransferGroupIds(List.of(group))).thenReturn(List.of(negative, positive));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<Transaction> reverted = service.unpairTransfer(1L);
+
+        assertThat(reverted).hasSize(2);
+        assertThat(reverted).allSatisfy(t -> {
+            assertThat(t.getNature()).isEqualTo(TransactionNature.forSignedAmount(t.getAmount()));
+            assertThat(t.getTransferGroupId()).isNull();
+            assertThat(t.getCategoryId()).isNull();
+        });
+    }
+
+    @Test
+    void unpairTransferRejectsANonTransferRow() {
+        Transaction plain = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE);
+        when(transactions.findById(1L)).thenReturn(Optional.of(plain));
+
+        assertThatThrownBy(() -> service.unpairTransfer(1L))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(transactions, org.mockito.Mockito.never()).saveAll(any());
     }
 }

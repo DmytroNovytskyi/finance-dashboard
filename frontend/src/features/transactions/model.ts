@@ -1,5 +1,13 @@
-import type { TransactionListParams } from '../../api/endpoints'
+import type { TransactionListParams, TransactionSortKey } from '../../api/endpoints'
 import type { TransactionNature } from '../../types'
+
+/** Current sort of the transactions list. */
+export interface TransactionSort {
+  key: TransactionSortKey
+  dir: 'asc' | 'desc'
+}
+
+export const DEFAULT_TRANSACTION_SORT: TransactionSort = { key: 'date', dir: 'desc' }
 
 /** User-facing filters for the transactions list. */
 export interface TxFilters {
@@ -34,7 +42,12 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
 }
 
 /** Converts the filters into API list parameters (uncategorized and categoryId are exclusive). */
-export function toListParams(filters: TxFilters, page: number, size: number): TransactionListParams {
+export function toListParams(
+  filters: TxFilters,
+  page: number,
+  size: number,
+  sort?: TransactionSort,
+): TransactionListParams {
   return {
     accountId: filters.accountId,
     categoryId: filters.uncategorized ? undefined : filters.categoryId,
@@ -43,6 +56,7 @@ export function toListParams(filters: TxFilters, page: number, size: number): Tr
     from: filters.from || undefined,
     to: filters.to || undefined,
     q: filters.q || undefined,
+    ...(sort ? { sort: sort.key, order: sort.dir } : {}),
     page,
     size,
   }

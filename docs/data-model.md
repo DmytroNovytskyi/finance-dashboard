@@ -6,16 +6,22 @@ must be updated alongside it.
 
 ## `account`
 
-An account the user owns (e.g. "Personal PLN", "Business USD"). Accounts are created and
-renamed but never deleted.
+An account the user owns (e.g. "Pekao PLN", "Business USD"). Accounts are **created
+automatically** by a statement import that names them (currency and account number come from
+the file, the name is a default label) and are **removed automatically** once they hold no
+transactions or statements (deleting an account's last statement deletes the account). They can
+also be **deleted explicitly**, which removes the account, its statements, and all its
+transactions (re-importing a statement recreates the account). The user renames the account and
+tags its `kind`; `currency` follows the statements, and `account_number` is stored in canonical
+digits-only form so later statements of the same account are matched to it.
 
 | column | type | notes |
 |---|---|---|
 | id | bigserial PK | |
-| name | varchar not null | |
+| name | varchar not null | defaulted at import, user-editable |
 | currency | char(3) not null | native currency of the account |
 | kind | varchar null | optional `PERSONAL` / `BUSINESS` tag |
-| account_number | varchar null | masked; reserved for transfer matching |
+| account_number | varchar null | canonical digits-only; matches statements on import |
 | sort_order | int not null default 0 | |
 | created_at / updated_at | timestamptz | |
 
@@ -80,16 +86,33 @@ One imported file, attributed to exactly one account.
 | description | text | raw from the statement |
 | merchant | varchar null | extracted counterparty |
 | category_id | bigint FK → category, null | null = uncategorized |
-| base_amount | numeric(19,4) null | converted to the base currency |
-| fx_rate | numeric(20,8) null | rate used |
-| fx_rate_date | date null | date of the rate |
 | dedup_hash | varchar | (date, amount, currency, description) — idempotent import |
 | transfer_group_id | uuid null | shared by the two legs of an internal transfer |
 | created_at | timestamptz | |
 
 `EXPENSE` and `INCOME` participate in statistics; `TRANSFER` rows (money moved between the
 user's own accounts, including currency conversions) are excluded from all spend/income
-stats.
+stats. The `amount`/`currency` pair is the **native** value from the statement (what the account
+is denominated in) — see `transaction_amount` for the per-currency views.
+
+## `transaction_amount`
+
+Each transaction is valued in every supported currency at its own transaction date. The row for
+the native currency carries the amount verbatim; every other row is derived at import time from
+the `fx_rate` table (or live NBP within a short lookback window, see `docs/fx-rates.md`). Rows are
+immutable facts: written once at import, cascade-deleted with their parent, never updated in
+place.
+
+| column | type | notes |
+|---|---|---|
+| transaction_id | bigint FK → transaction not null | on delete cascade |
+| currency | char(3) not null | ISO 4217 |
+| amount | numeric(19,4) not null | the transaction valued in `currency` |
+
+Primary key is `(transaction_id, currency)`. Statistics **sum the stored amount in the requested
+currency**; there is no read-time conversion and no "unconverted" concept. Existing transactions
+imported before this table (or missing a newly-added currency) are filled by the idempotent
+backfill, never recomputed on read.
 
 ## `fx_rate`
 

@@ -41,4 +41,19 @@ public class AccountRepositoryAdapter implements AccountRepository {
     public boolean existsById(Long id) {
         return jpa.existsById(id);
     }
+
+    @Override
+    public Optional<Account> findByAccountNumber(String accountNumber) {
+        return jpa.findFirstByAccountNumberOrderByIdAsc(accountNumber).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Account> findFirstByCurrency(String currency) {
+        return jpa.findFirstByCurrencyOrderBySortOrderAscIdAsc(currency).map(mapper::toDomain);
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        jpa.deleteById(id);
+    }
 }

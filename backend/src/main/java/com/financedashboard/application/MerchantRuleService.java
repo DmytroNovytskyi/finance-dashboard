@@ -63,13 +63,63 @@ public class MerchantRuleService {
         return detail(saved, categories.findById(categoryId).orElseThrow());
     }
 
-    /** Deletes the rule with the given id. */
+    /**
+     * Deletes the rule with the given id and un-links it: the categorized, non-transfer
+     * transactions that were tagged through it (same merchant and the rule's category) become
+     * uncategorized again. Returns how many rows were reverted.
+     */
     @Transactional
-    public void delete(Long id) {
-        if (!rules.existsById(id)) {
-            throw new NotFoundException("Merchant rule " + id + " not found");
-        }
+    public int delete(Long id) {
+        MerchantRule rule = rules.findById(id)
+                .orElseThrow(() -> new NotFoundException("Merchant rule " + id + " not found"));
         rules.deleteById(id);
+        Map<String, Long> categoryByMerchant = Map.of(rule.getMerchant(), rule.getCategoryId());
+        List<Transaction> reverted = transactions.findCategorized().stream()
+                .filter(transaction -> usesLink(transaction, categoryByMerchant))
+                .map(transaction -> transaction.toBuilder().categoryId(null).build())
+                .toList();
+        if (!reverted.isEmpty()) {
+            transactions.saveAll(reverted);
+        }
+        return reverted.size();
+    }
+
+    /**
+     * Deletes every default rule and reverts the transactions it had auto-tagged: a categorized,
+     * non-transfer row whose merchant matches a removed rule and whose category equals that rule's
+     * category becomes uncategorized again. Returns the number of reverted transactions.
+     */
+    @Transactional
+    public ClearAllResult clearAll() {
+        List<MerchantRule> all = rules.findAll();
+        if (all.isEmpty()) {
+            return new ClearAllResult(0, 0);
+        }
+        Map<String, Long> categoryByMerchant = all.stream()
+                .collect(Collectors.toMap(MerchantRule::getMerchant, MerchantRule::getCategoryId));
+        for (MerchantRule rule : all) {
+            rules.deleteById(rule.getId());
+        }
+        List<Transaction> reverted = transactions.findCategorized().stream()
+                .filter(transaction -> usesLink(transaction, categoryByMerchant))
+                .map(transaction -> transaction.toBuilder().categoryId(null).build())
+                .toList();
+        if (!reverted.isEmpty()) {
+            transactions.saveAll(reverted);
+        }
+        return new ClearAllResult(all.size(), reverted.size());
+    }
+
+    private static boolean usesLink(Transaction transaction, Map<String, Long> categoryByMerchant) {
+        if (transaction.getMerchant() == null || transaction.getCategoryId() == null) {
+            return false;
+        }
+        Long ruleCategory = categoryByMerchant.get(normalize(transaction.getMerchant()));
+        return ruleCategory != null && ruleCategory.equals(transaction.getCategoryId());
+    }
+
+    /** Number of defaults removed and transactions reverted by {@link #clearAll()}. */
+    public record ClearAllResult(int rulesRemoved, int transactionsUncategorized) {
     }
 
     /**

@@ -26,14 +26,16 @@ class PekaoPdfParserTest {
     }
 
     @Test
-    void parsesPeriodCurrencyAndBank() {
+    void parsesPeriodCurrencyBankAndAccountNumber() {
         ParsedStatement statement = parser.parse(PekaoTestPdf.threeTransactions());
 
         assertThat(statement.bank()).isEqualTo("PEKAO");
         assertThat(statement.currency()).isEqualTo("PLN");
+        assertThat(statement.accountNumber()).isEqualTo("00000000000000000000000002");
         assertThat(statement.periodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
         assertThat(statement.periodEnd()).isEqualTo(LocalDate.of(2026, 3, 25));
     }
+
 
     @Test
     void parsesTransactionsReconcilingToStatementTotals() {

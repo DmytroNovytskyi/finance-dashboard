@@ -83,7 +83,25 @@ export interface StatisticsSummary {
   byCategory: StatisticsByCategory[]
   topMerchants: StatisticsByMerchant[]
   trend: StatisticsTrendPoint[]
-  unconverted: number
+}
+
+/** One category's income/expense per time bucket (used for the bucket granularities). */
+export interface StatisticsCategoryTrend {
+  baseCurrency: string
+  trend: StatisticsTrendPoint[]
+}
+
+/** One category's individual transactions, each as a dated amount in the requested currency. */
+export interface StatisticsCategorySeries {
+  baseCurrency: string
+  points: StatisticsCategorySeriesPoint[]
+}
+
+export interface StatisticsCategorySeriesPoint {
+  /** ISO date of the transaction. */
+  date: string
+  /** Signed base-currency amount of that transaction (income positive, expense negative). */
+  amount: number
 }
 
 export interface StatisticsTrendPoint {
@@ -138,4 +156,24 @@ export interface StatisticsByMerchant {
   income: number
   expense: number
   net: number
+}
+
+/** One detected internal transfer between the user's own accounts (not yet applied). */
+export interface TransferSuggestion {
+  fromTransactionId: number
+  toTransactionId: number
+  fromAccountId: number
+  toAccountId: number
+  amount: number
+  currency: string
+  fromDate: string
+  toDate: string
+  reason: 'MIRROR' | 'AMOUNT'
+}
+
+/** The two legs of an applied internal transfer. */
+export interface TransferPair {
+  transferGroupId: string | null
+  from: Transaction
+  to: Transaction
 }

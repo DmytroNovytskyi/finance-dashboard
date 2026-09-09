@@ -9,6 +9,8 @@ import com.financedashboard.application.exception.NotFoundException;
 import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.TransactionFilter;
+import com.financedashboard.domain.transaction.TransactionOrder;
+import com.financedashboard.domain.transaction.TransactionSortField;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -28,29 +30,31 @@ class TransactionServiceTest {
 
     private static final TransactionFilter NO_FILTER =
             new TransactionFilter(null, null, null, null, null, null, null);
+    private static final TransactionOrder DEFAULT_ORDER =
+            new TransactionOrder(TransactionSortField.DATE, false);
 
     @Test
     void listDefaultsPageZeroAndSizeFifty() {
-        when(transactions.search(eq(NO_FILTER), eq(0), eq(50)))
+        when(transactions.search(eq(NO_FILTER), eq(0), eq(50), eq(DEFAULT_ORDER)))
                 .thenReturn(new PagedTransactions(List.of(), 0, 0, 50));
 
         service.list(NO_FILTER, null, null);
 
-        verify(transactions).search(eq(NO_FILTER), eq(0), eq(50));
+        verify(transactions).search(eq(NO_FILTER), eq(0), eq(50), eq(DEFAULT_ORDER));
     }
 
     @Test
     void listClampsPagingToAllowedBounds() {
-        when(transactions.search(eq(NO_FILTER), eq(0), eq(200)))
-                .thenReturn(new PagedTransactions(List.of(), 0, 0, 200));
-        when(transactions.search(eq(NO_FILTER), eq(0), eq(1)))
+        when(transactions.search(eq(NO_FILTER), eq(0), eq(10_000), eq(DEFAULT_ORDER)))
+                .thenReturn(new PagedTransactions(List.of(), 0, 0, 10_000));
+        when(transactions.search(eq(NO_FILTER), eq(0), eq(1), eq(DEFAULT_ORDER)))
                 .thenReturn(new PagedTransactions(List.of(), 0, 0, 1));
 
-        service.list(NO_FILTER, -5, 5000);
+        service.list(NO_FILTER, -5, 20_000);
         service.list(NO_FILTER, 0, 0);
 
-        verify(transactions).search(eq(NO_FILTER), eq(0), eq(200));
-        verify(transactions).search(eq(NO_FILTER), eq(0), eq(1));
+        verify(transactions).search(eq(NO_FILTER), eq(0), eq(10_000), eq(DEFAULT_ORDER));
+        verify(transactions).search(eq(NO_FILTER), eq(0), eq(1), eq(DEFAULT_ORDER));
     }
 
     @Test

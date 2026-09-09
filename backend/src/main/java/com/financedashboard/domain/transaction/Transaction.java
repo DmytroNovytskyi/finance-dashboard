@@ -24,8 +24,5 @@ public class Transaction {
     private final String merchant;
     private final Long categoryId;
     private final String dedupHash;
-    private final BigDecimal baseAmount;
-    private final BigDecimal fxRate;
-    private final LocalDate fxRateDate;
     private final UUID transferGroupId;
 }

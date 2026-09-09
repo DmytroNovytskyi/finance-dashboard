@@ -5,6 +5,9 @@ import com.financedashboard.application.TransactionService;
 import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.TransactionFilter;
 import com.financedashboard.domain.transaction.TransactionNature;
+import com.financedashboard.domain.transaction.TransactionOrder;
+import com.financedashboard.domain.transaction.TransactionSortField;
+import com.financedashboard.web.dto.BulkCountResponse;
 import com.financedashboard.web.dto.CategorizeRequest;
 import com.financedashboard.web.dto.PageResponse;
 import com.financedashboard.web.dto.TransactionResponse;
@@ -44,12 +47,14 @@ public class TransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String order,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
 
         TransactionFilter filter = new TransactionFilter(
                 accountId, categoryId, uncategorized, nature, from, to, q);
-        PagedTransactions result = transactions.list(filter, page, size);
+        PagedTransactions result = transactions.list(filter, page, size, toOrder(sort, order));
         List<TransactionResponse> content = result.content().stream()
                 .map(TransactionResponse::from)
                 .toList();
@@ -86,6 +91,12 @@ public class TransactionController {
         edit.categorizeBulk(request.transactionIds(), request.categoryId());
     }
 
+    /** Clears the category of every categorized transaction (except internal transfers). */
+    @PostMapping("/uncategorize-all")
+    public BulkCountResponse uncategorizeAll() {
+        return new BulkCountResponse(edit.uncategorizeAll());
+    }
+
     /** Deletes transactions in an inclusive date range, optionally restricted to one account. */
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -94,5 +105,18 @@ public class TransactionController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long accountId) {
         edit.deleteRange(from, to, accountId);
+    }
+
+    private static TransactionOrder toOrder(String sort, String order) {
+        TransactionSortField field = TransactionSortField.DATE;
+        if (sort != null) {
+            for (TransactionSortField candidate : TransactionSortField.values()) {
+                if (candidate.name().equalsIgnoreCase(sort)) {
+                    field = candidate;
+                    break;
+                }
+            }
+        }
+        return new TransactionOrder(field, "asc".equalsIgnoreCase(order));
     }
 }

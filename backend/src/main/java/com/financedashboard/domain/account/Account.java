@@ -4,7 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-/** An account the user owns. Accounts are created and renamed but never deleted. */
+/**
+ * An account the user owns. An account is normally created automatically from an imported
+ * statement and disappears once it holds no transactions; {@code kind} and {@code name} are
+ * user-managed, {@code currency} and {@code accountNumber} follow the statements of the account.
+ */
 @Getter
 @Builder(toBuilder = true)
 @AllArgsConstructor

@@ -5,10 +5,14 @@ import type {
   PageResponse,
   Statement,
   StatementImportResult,
+  StatisticsCategorySeries,
+  StatisticsCategoryTrend,
   StatisticsGranularity,
   StatisticsSummary,
   Transaction,
   TransactionNature,
+  TransferPair,
+  TransferSuggestion,
 } from '../types'
 import { buildQuery, request } from './client'
 
@@ -20,9 +24,13 @@ export interface TransactionListParams {
   from?: string
   to?: string
   q?: string
+  sort?: TransactionSortKey
+  order?: 'asc' | 'desc'
   page?: number
   size?: number
 }
+
+export type TransactionSortKey = 'date' | 'amount' | 'account' | 'category'
 
 export interface StatisticsParams {
   from?: string
@@ -31,6 +39,8 @@ export interface StatisticsParams {
   kind?: string
   topN?: number
   granularity?: StatisticsGranularity
+  /** Selects which stored per-transaction currency is summed for the figures. */
+  displayCurrency?: string
 }
 
 export interface CategoryInput {
@@ -51,6 +61,8 @@ export const accountsApi = {
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: number, input: Partial<AccountInput>) =>
     request<Account>(`/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  /** Removes the account together with all its statements and transactions. */
+  remove: (id: number) => request<{ count: number }>(`/accounts/${id}`, { method: 'DELETE' }),
 }
 
 export const categoriesApi = {
@@ -60,14 +72,17 @@ export const categoriesApi = {
   update: (id: number, input: { name?: string; color?: string | null }) =>
     request<Category>(`/categories/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   remove: (id: number) => request<void>(`/categories/${id}`, { method: 'DELETE' }),
+  /** Clears the category from its transactions, keeping the category itself. */
+  uncategorize: (id: number) =>
+    request<{ count: number }>(`/categories/${id}/uncategorize`, { method: 'POST' }),
 }
 
 export const statementsApi = {
   list: () => request<Statement[]>('/statements'),
-  importPdf: (accountId: number, file: File) => {
+  importPdf: (file: File) => {
     const body = new FormData()
     body.append('file', file)
-    return request<StatementImportResult>(`/statements?accountId=${accountId}`, {
+    return request<StatementImportResult>('/statements', {
       method: 'POST',
       body,
     })
@@ -86,6 +101,8 @@ export const transactionsApi = {
       method: 'POST',
       body: JSON.stringify({ transactionIds, categoryId }),
     }),
+  uncategorizeAll: () =>
+    request<{ count: number }>('/transactions/uncategorize-all', { method: 'POST' }),
   deleteRange: (from: string, to: string, accountId?: number) =>
     request<void>(`/transactions${buildQuery({ from, to, accountId })}`, { method: 'DELETE' }),
 }
@@ -93,6 +110,28 @@ export const transactionsApi = {
 export const statisticsApi = {
   summary: (params: StatisticsParams) =>
     request<StatisticsSummary>(`/statistics/summary${buildQuery(params)}`),
+  /** One category's individual transactions as dated base-currency amounts. */
+  categorySeries: (categoryId: number, params: StatisticsParams) =>
+    request<StatisticsCategorySeries>(`/statistics/categories/${categoryId}/transactions${buildQuery(params)}`),
+  /** One category's income/expense bucketed by granularity. */
+  categoryTrend: (categoryId: number, params: StatisticsParams) =>
+    request<StatisticsCategoryTrend>(`/statistics/categories/${categoryId}/trend${buildQuery(params)}`),
+}
+
+export const transfersApi = {
+  /** Detected own-account transfer pairs that are not yet internal transfers. */
+  suggestions: () => request<TransferSuggestion[]>('/transfers/suggestions'),
+  /** Applies one pair as an internal transfer. */
+  pair: (fromTransactionId: number, toTransactionId: number) =>
+    request<TransferPair>('/transfers', {
+      method: 'POST',
+      body: JSON.stringify({ fromTransactionId, toTransactionId }),
+    }),
+  /** Applies every current suggestion as an internal transfer. */
+  applyAll: () => request<{ applied: number }>('/transfers/suggestions/apply', { method: 'POST' }),
+  /** Reverts an internal transfer back to its natural income/expense legs. */
+  unlink: (transactionId: number) =>
+    request<{ count: number }>(`/transfers/${transactionId}/unlink`, { method: 'POST' }),
 }
 
 export const merchantRulesApi = {
@@ -100,6 +139,8 @@ export const merchantRulesApi = {
   create: (input: { merchant: string; categoryId: number }) =>
     request<MerchantRule>('/merchant-rules', { method: 'POST', body: JSON.stringify(input) }),
   remove: (id: number) => request<void>(`/merchant-rules/${id}`, { method: 'DELETE' }),
+  clearAll: () =>
+    request<{ rulesRemoved: number; transactionsUncategorized: number }>('/merchant-rules', { method: 'DELETE' }),
   apply: () => request<{ applied: number }>('/merchant-rules/apply', { method: 'POST' }),
   applyOne: (id: number) => request<{ applied: number }>(`/merchant-rules/${id}/apply`, { method: 'POST' }),
 }

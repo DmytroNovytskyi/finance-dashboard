@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Add from '@mui/icons-material/Add'
 import Delete from '@mui/icons-material/Delete'
+import LinkOff from '@mui/icons-material/LinkOff'
 import Lock from '@mui/icons-material/Lock'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -15,7 +16,7 @@ import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
-import { useCreateCategory, useDeleteCategory, useUpdateCategory } from './hooks'
+import { useCreateCategory, useDeleteCategory, useUncategorizeCategory, useUpdateCategory } from './hooks'
 
 interface CategoryManagerProps {
   categories: CategoryPresentation[]
@@ -35,11 +36,12 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const create = useCreateCategory()
   const update = useUpdateCategory()
   const remove = useDeleteCategory()
+  const unlink = useUncategorizeCategory()
 
   const [editor, setEditor] = useState<EditorState>({ open: false, name: '', color: EMPTY_COLOR })
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null)
 
-  const mutationError = (create.error ?? update.error ?? remove.error) as Error | null
+  const mutationError = (create.error ?? update.error ?? remove.error ?? unlink.error) as Error | null
 
   const openCreate = () => setEditor({ open: true, name: '', color: EMPTY_COLOR })
   const openEdit = (category: CategoryPresentation) => setEditor({ open: true, id: category.id, name: category.name, color: category.color })
@@ -103,10 +105,24 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             >
               {category.name}
             </Typography>
-            {category.system ? <Lock fontSize="small" sx={{ color: 'text.disabled' }} aria-label="System category" /> : (
-              <IconButton size="small" onClick={() => setConfirmDelete({ id: category.id, name: category.name })} aria-label={`Delete ${category.name}`}>
-                <Delete fontSize="small" />
+            {category.system ? (
+              <IconButton size="small" tabIndex={-1} aria-label="System category" sx={{ color: 'text.disabled' }}>
+                <Lock fontSize="small" />
               </IconButton>
+            ) : (
+              <>
+                <IconButton
+                  size="small"
+                  onClick={() => unlink.mutate(category.id)}
+                  title="Unlink: clear this category from its transactions"
+                  aria-label={`Unlink ${category.name}`}
+                >
+                  <LinkOff fontSize="small" />
+                </IconButton>
+                <IconButton size="small" onClick={() => setConfirmDelete({ id: category.id, name: category.name })} aria-label={`Delete ${category.name}`}>
+                  <Delete fontSize="small" />
+                </IconButton>
+              </>
             )}
           </Box>
         ))}

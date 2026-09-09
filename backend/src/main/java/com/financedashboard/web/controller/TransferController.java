@@ -4,6 +4,7 @@ import com.financedashboard.application.TransactionEditService;
 import com.financedashboard.application.TransferSuggestionService;
 import com.financedashboard.application.TransferSuggestionService.SuggestedTransfer;
 import com.financedashboard.domain.transaction.Transaction;
+import com.financedashboard.web.dto.BulkCountResponse;
 import com.financedashboard.web.dto.PairTransferRequest;
 import com.financedashboard.web.dto.TransactionResponse;
 import com.financedashboard.web.dto.TransferApplyResponse;
@@ -14,6 +15,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,5 +53,14 @@ public class TransferController {
     public TransferApplyResponse applySuggestions() {
         int applied = suggestions.apply(transfers);
         return new TransferApplyResponse(applied);
+    }
+
+    /**
+     * Reverts the internal transfer that one of its legs belongs to: every leg becomes a normal
+     * income/expense again. Returns how many legs were reverted.
+     */
+    @PostMapping("/{transactionId}/unlink")
+    public BulkCountResponse unlink(@PathVariable Long transactionId) {
+        return new BulkCountResponse(transfers.unpairTransfer(transactionId).size());
     }
 }

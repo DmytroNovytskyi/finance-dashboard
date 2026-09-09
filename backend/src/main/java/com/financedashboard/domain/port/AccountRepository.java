@@ -22,4 +22,19 @@ public interface AccountRepository {
 
     /** Returns whether an account with the given id exists. */
     boolean existsById(Long id);
+
+    /**
+     * Returns the first account carrying the given canonical (digits-only) account number, if any.
+     * Used to resolve the account a statement belongs to on import.
+     */
+    Optional<Account> findByAccountNumber(String accountNumber);
+
+    /**
+     * Returns the first account in the given currency, if any. Fallback for statements that do not
+     * name their account number.
+     */
+    Optional<Account> findFirstByCurrency(String currency);
+
+    /** Deletes the account with the given id. */
+    void deleteById(Long id);
 }

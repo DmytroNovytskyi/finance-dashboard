@@ -1,5 +1,6 @@
 package com.financedashboard.infrastructure.parser;
 
+import com.financedashboard.domain.account.AccountNumbers;
 import com.financedashboard.domain.exception.StatementParseException;
 import com.financedashboard.domain.port.BankStatementParser;
 import com.financedashboard.domain.statement.ParsedStatement;
@@ -47,6 +48,8 @@ public class PekaoPdfParser implements BankStatementParser {
     private static final Pattern TRANSACTION_LINE = Pattern.compile(
             "^(\\d{2}/\\d{2}/\\d{4})\\s+(-?[0-9][0-9 .]*,[0-9]{2})\\s*(.*)$");
     private static final Pattern PAGE_FOOTER = Pattern.compile("^Strona\\s+\\d+/\\d+$");
+    private static final Pattern EXPLICIT_IBAN = Pattern.compile(
+            "Numer IBAN tego rachunku:\\s*([A-Z0-9 ]+)");
     private static final java.util.Set<String> ISO_CODES = java.util.Set.of(
             "PLN", "EUR", "USD", "GBP", "CHF", "CZK", "SEK", "NOK", "DKK", "HUF", "JPY",
             "CAD", "AUD", "RON", "BGN");
@@ -95,6 +98,7 @@ public class PekaoPdfParser implements BankStatementParser {
         LocalDate periodStart = LocalDate.parse(period.group(1), DATE);
         LocalDate periodEnd = LocalDate.parse(period.group(2), DATE);
         String currency = detectCurrency(text);
+        String accountNumber = detectAccountNumber(text);
 
         List<ParsedTransaction> transactions = new ArrayList<>();
         String[] lines = text.split("\\r?\\n");
@@ -143,7 +147,7 @@ public class PekaoPdfParser implements BankStatementParser {
         if (transactions.isEmpty()) {
             throw new StatementParseException("No transactions found in statement");
         }
-        return new ParsedStatement(BANK_ID, currency, periodStart, periodEnd, transactions);
+        return new ParsedStatement(BANK_ID, currency, periodStart, periodEnd, transactions, accountNumber);
     }
 
     private static boolean isOperationsHeader(String trimmed) {
@@ -178,21 +182,48 @@ public class PekaoPdfParser implements BankStatementParser {
         String header = sectionStart >= 0 ? text.substring(0, sectionStart) : text;
         for (String line : header.split("\\r?\\n")) {
             long digits = line.chars().filter(Character::isDigit).count();
-            if (digits < 10) {
-                continue;
-            }
-            Matcher m = Pattern.compile("\\b([A-Z]{3})\\b").matcher(line);
-            String lastIso = null;
-            while (m.find()) {
-                if (ISO_CODES.contains(m.group(1))) {
-                    lastIso = m.group(1);
-                }
-            }
-            if (lastIso != null) {
-                return lastIso;
+            if (digits >= 10 && isoOnLine(line) != null) {
+                return isoOnLine(line);
             }
         }
         return "PLN";
+    }
+
+    /**
+     * Detects the account this statement belongs to, in canonical digits-only form. Prefers the
+     * explicit "Numer IBAN tego rachunku" row (full IBAN on real statements); otherwise falls back
+     * to the first header line that reads like the account row (many digits plus an ISO currency
+     * code, e.g. the synthetic test documents).
+     */
+    private static String detectAccountNumber(String text) {
+        Matcher explicit = EXPLICIT_IBAN.matcher(text);
+        if (explicit.find()) {
+            String candidate = AccountNumbers.canonical(explicit.group(1));
+            if (candidate != null && candidate.length() >= 22) {
+                return candidate;
+            }
+        }
+        int sectionStart = text.indexOf("Wyszczególnienie transakcji");
+        String header = sectionStart >= 0 ? text.substring(0, sectionStart) : text;
+        for (String line : header.split("\\r?\\n")) {
+            long digits = line.chars().filter(Character::isDigit).count();
+            if (digits >= 24 && isoOnLine(line) != null) {
+                return AccountNumbers.canonical(line);
+            }
+        }
+        return null;
+    }
+
+    /** Returns the last ISO currency code appearing on the line, or null when there is none. */
+    private static String isoOnLine(String line) {
+        Matcher m = Pattern.compile("\\b([A-Z]{3})\\b").matcher(line);
+        String lastIso = null;
+        while (m.find()) {
+            if (ISO_CODES.contains(m.group(1))) {
+                lastIso = m.group(1);
+            }
+        }
+        return lastIso;
     }
 
     private static boolean isPdf(byte[] content) {

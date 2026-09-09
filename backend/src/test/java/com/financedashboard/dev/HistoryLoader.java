@@ -7,7 +7,6 @@ import com.financedashboard.application.TransferSuggestionService;
 import com.financedashboard.application.TransferSuggestionService.SuggestedTransfer;
 import com.financedashboard.domain.account.Account;
 import com.financedashboard.domain.port.AccountRepository;
-import com.financedashboard.infrastructure.parser.PekaoPdfParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,8 +16,6 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -29,10 +26,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Dev tool: loads the user's real statement history from {@code local/} into the dev database,
- * auto-creating one account per statement IBAN, then prints detected transfer suggestions.
- * Disabled unless the JVM system property {@code finance.history-loader} is {@code true}
- * (forwarded from Gradle). Never part of normal CI.
+ * Dev tool: loads the user's real statement history from {@code local/} into the dev database.
+ * Each statement is imported through the normal flow, so one account is created per statement
+ * account number, then detected transfer suggestions are printed. Disabled unless the JVM system
+ * property {@code finance.history-loader} is {@code true} (forwarded from Gradle). Never part of
+ * normal CI.
  */
 @SpringBootTest
 @EnabledIfSystemProperty(named = "finance.history-loader", matches = "true")
@@ -57,40 +55,20 @@ class HistoryLoader {
         jdbc.execute("delete from account");
         jdbc.execute("delete from fx_rate");
 
-        PekaoPdfParser parser = new PekaoPdfParser();
-        Map<String, Account> accountByIban = new LinkedHashMap<>();
         int importedFiles = 0;
         int importedTx = 0;
-
-        List<byte[]> unique = uniqueContent(local);
-        for (byte[] bytes : unique) {
-            String text = extractText(bytes);
-            String iban = ibanOf(text);
-            if (iban == null) {
-                System.out.println("[loader] skip: no IBAN in statement");
-                continue;
-            }
-            var parsed = parser.parse(bytes);
-            Account account = accountByIban.get(iban);
-            if (account == null) {
-                account = accounts.save(Account.builder()
-                        .name("Pekao …" + last6(iban))
-                        .currency(parsed.currency())
-                        .accountNumber(iban)
-                        .sortOrder(accountByIban.size() + 1)
-                        .build());
-                accountByIban.put(iban, account);
-            }
+        for (byte[] bytes : uniqueContent(local)) {
             StatementImportService.StatementImportResult result =
-                    importer.importStatement(bytes, "application/pdf", account.getId(), "history.pdf");
+                    importer.importStatement(bytes, "application/pdf", "history.pdf");
             importedFiles++;
             importedTx += result.imported();
         }
 
         System.out.println("[loader] accounts:");
-        accountByIban.values().forEach(a ->
-                System.out.println("[loader]   " + a.getId() + " " + a.getName()
-                        + " " + a.getCurrency() + " " + a.getAccountNumber()));
+        for (Account account : accounts.findAll()) {
+            System.out.println("[loader]   " + account.getId() + " " + account.getName()
+                    + " " + account.getCurrency() + " " + account.getAccountNumber());
+        }
         System.out.println("[loader] imported files=" + importedFiles + " transactions=" + importedTx);
 
         List<SuggestedTransfer> found = suggestions.suggest();
@@ -113,15 +91,6 @@ class HistoryLoader {
             }
         }
         return new ArrayList<>(byText.values());
-    }
-
-    private static String ibanOf(String text) {
-        Matcher m = Pattern.compile("Numer IBAN tego rachunku:\\s*([A-Z0-9 ]+)").matcher(text);
-        return m.find() ? m.group(1).replaceAll("\\s", "") : null;
-    }
-
-    private static String last6(String iban) {
-        return iban.substring(iban.length() - 6);
     }
 
     private static String sha(String s) throws Exception {

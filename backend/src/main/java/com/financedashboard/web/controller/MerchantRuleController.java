@@ -1,6 +1,7 @@
 package com.financedashboard.web.controller;
 
 import com.financedashboard.application.MerchantRuleService;
+import com.financedashboard.web.dto.ClearDefaultsResponse;
 import com.financedashboard.web.dto.MerchantRuleApplyResponse;
 import com.financedashboard.web.dto.MerchantRuleCreateRequest;
 import com.financedashboard.web.dto.MerchantRuleResponse;
@@ -51,5 +52,12 @@ public class MerchantRuleController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         rules.delete(id);
+    }
+
+    /** Deletes every default and reverts the transactions it had auto-tagged. */
+    @DeleteMapping
+    public ClearDefaultsResponse clearAll() {
+        MerchantRuleService.ClearAllResult result = rules.clearAll();
+        return new ClearDefaultsResponse(result.rulesRemoved(), result.transactionsUncategorized());
     }
 }

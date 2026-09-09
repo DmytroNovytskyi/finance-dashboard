@@ -5,9 +5,13 @@ import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionFilter;
 import com.financedashboard.domain.transaction.TransactionNature;
+import com.financedashboard.domain.transaction.TransactionOrder;
+import com.financedashboard.domain.transaction.TransactionSortField;
 import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.infrastructure.persistence.entity.TransactionEntity;
 import com.financedashboard.infrastructure.persistence.mapper.TransactionMapper;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
@@ -35,12 +39,14 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TransactionRepositoryAdapter implements TransactionRepository {
 
-    private static final Sort DEFAULT_SORT = Sort.by(
-            Sort.Order.desc("transactionDate"),
-            Sort.Order.desc("id"));
+    private static final TransactionOrder DEFAULT_ORDER =
+            new TransactionOrder(TransactionSortField.DATE, false);
 
     private final TransactionJpaRepository jpa;
     private final TransactionMapper mapper;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
     public Transaction save(Transaction transaction) {
@@ -112,8 +118,18 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public boolean existsByAccountId(Long accountId) {
+        return jpa.existsByAccountId(accountId);
+    }
+
+    @Override
     public List<Transaction> findByStatementId(Long statementId) {
         return mapper.toDomain(jpa.findByStatementId(statementId));
+    }
+
+    @Override
+    public List<Transaction> findByAccountId(Long accountId) {
+        return mapper.toDomain(jpa.findByAccountIdOrderByTransactionDateAscIdAsc(accountId));
     }
 
     @Override
@@ -130,6 +146,17 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     public void deleteAll(Collection<Transaction> transactions) {
         List<Long> ids = transactions.stream().map(Transaction::getId).toList();
         jpa.deleteAllByIdInBatch(ids);
+        for (Long id : ids) {
+            TransactionEntity managed = entityManager.find(TransactionEntity.class, id);
+            if (managed != null) {
+                entityManager.detach(managed);
+            }
+        }
+    }
+
+    @Override
+    public List<Transaction> findAll() {
+        return mapper.toDomain(jpa.findAll(Sort.by(Sort.Order.asc("transactionDate"), Sort.Order.asc("id"))));
     }
 
     @Override
@@ -143,14 +170,35 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public List<Transaction> findCategorized() {
+        return mapper.toDomain(jpa.findByCategoryIdIsNotNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature.TRANSFER));
+    }
+
+    @Override
     public PagedTransactions search(TransactionFilter filter, int page, int size) {
+        return search(filter, page, size, DEFAULT_ORDER);
+    }
+
+    @Override
+    public PagedTransactions search(TransactionFilter filter, int page, int size, TransactionOrder order) {
         Page<TransactionEntity> result = jpa.findAll(toSpecification(filter),
-                PageRequest.of(page, size, DEFAULT_SORT));
+                PageRequest.of(page, size, toSpringSort(order)));
         return new PagedTransactions(
                 mapper.toDomain(result.getContent()),
                 result.getTotalElements(),
                 page,
                 size);
+    }
+
+    private static Sort toSpringSort(TransactionOrder order) {
+        Sort.Direction direction = order.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String path = switch (order.field()) {
+            case DATE -> "transactionDate";
+            case AMOUNT -> "amount";
+            case ACCOUNT -> "account.name";
+            case CATEGORY -> "category.name";
+        };
+        return Sort.by(direction, path).and(Sort.by(Sort.Direction.DESC, "id"));
     }
 
     private static Specification<TransactionEntity> toSpecification(TransactionFilter filter) {

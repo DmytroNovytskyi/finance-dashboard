@@ -7,13 +7,15 @@ interface ChartCardProps {
   title: string
   subtitle?: string
   action?: ReactNode
+  /** Optional summary row rendered between the header and the plot (does not shrink the chart). */
+  meta?: ReactNode
   /** Fixed height reserved for the chart surface (includes room for the axes). */
   chartHeight?: number
   children: ReactNode
 }
 
 /** Outlined card that frames a chart title above a fixed-height plot area. */
-export function ChartCard({ title, subtitle, action, chartHeight = 260, children }: ChartCardProps) {
+export function ChartCard({ title, subtitle, action, meta, chartHeight = 260, children }: ChartCardProps) {
   return (
     <Paper
       variant="outlined"
@@ -32,6 +34,7 @@ export function ChartCard({ title, subtitle, action, chartHeight = 260, children
         </Box>
         {action}
       </Box>
+      {meta ? <Box sx={{ pt: 1 }}>{meta}</Box> : null}
       <Box sx={{ flex: 1, minHeight: chartHeight, pt: 1 }}>{children}</Box>
     </Paper>
   )

@@ -6,6 +6,7 @@ import Dashboard from '@mui/icons-material/Dashboard'
 import Menu from '@mui/icons-material/Menu'
 import ReceiptLong from '@mui/icons-material/ReceiptLong'
 import Sell from '@mui/icons-material/Sell'
+import ShowChart from '@mui/icons-material/ShowChart'
 import UploadFile from '@mui/icons-material/UploadFile'
 import AppBar from '@mui/material/AppBar'
 import Box from '@mui/material/Box'
@@ -19,11 +20,14 @@ import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
+import { CurrencySelect } from '../features/overview/CurrencySelect'
+import { useDisplayCurrency } from '../features/preferences/displayCurrency'
 
 const DRAWER_WIDTH = 280
 
 const NAV_ITEMS = [
   { to: '/', label: 'Overview', icon: Dashboard, end: true },
+  { to: '/categories', label: 'Categories', icon: ShowChart, end: false },
   { to: '/transactions', label: 'Transactions', icon: ReceiptLong, end: false },
   { to: '/categorize', label: 'Categorize', icon: Sell, end: false },
   { to: '/import', label: 'Import', icon: UploadFile, end: false },
@@ -61,15 +65,20 @@ export function AppShell() {
           '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box' },
         }}
       >
-        {!isMobile ? (
-          <Toolbar sx={{ gap: 1.5, px: 2 }}>
-            <AccountBalanceWallet color="primary" sx={{ flexShrink: 0 }} />
-            <Typography variant="h6" sx={{ whiteSpace: 'nowrap' }}>
-              Finance Dashboard
-            </Typography>
-          </Toolbar>
-        ) : null}
-        <NavList />
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {!isMobile ? (
+            <Toolbar sx={{ gap: 1.5, px: 2 }}>
+              <AccountBalanceWallet color="primary" sx={{ flexShrink: 0 }} />
+              <Typography variant="h6" sx={{ whiteSpace: 'nowrap' }}>
+                Finance Dashboard
+              </Typography>
+            </Toolbar>
+          ) : null}
+          <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+            <NavList />
+          </Box>
+          <CurrencyFooter />
+        </Box>
       </Drawer>
 
       <Box
@@ -84,6 +93,28 @@ export function AppShell() {
       >
         <Outlet />
       </Box>
+    </Box>
+  )
+}
+
+function CurrencyFooter() {
+  const { displayCurrency, setDisplayCurrency } = useDisplayCurrency()
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        px: 2,
+        borderTop: 1,
+        borderColor: 'divider',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.5,
+      }}
+    >
+      <Typography variant="caption" color="text.secondary">
+        Show amounts in
+      </Typography>
+      <CurrencySelect value={displayCurrency} onChange={setDisplayCurrency} />
     </Box>
   )
 }

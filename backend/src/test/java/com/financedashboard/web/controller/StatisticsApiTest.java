@@ -9,7 +9,14 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestPropertySource;
 
+/**
+ * Statistics read the stored per-transaction value in the requested currency. Rows are written
+ * directly (native PLN amount plus the exact child value); no FX provider is involved, so the
+ * class also enables USD to exercise the display-currency summing path.
+ */
+@TestPropertySource(properties = "finance.currencies=PLN,USD")
 class StatisticsApiTest extends AbstractIntegrationTest {
 
     @Test
@@ -27,7 +34,6 @@ class StatisticsApiTest extends AbstractIntegrationTest {
                         .param("to", "2026-03-31"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.baseCurrency").value("PLN"))
-                .andExpect(jsonPath("$.unconverted").value(0))
                 .andExpect(jsonPath("$.totals.income").value(0.0))
                 .andExpect(jsonPath("$.totals.expense").value(170.0))
                 .andExpect(jsonPath("$.totals.net").value(-170.0))
@@ -184,6 +190,68 @@ class StatisticsApiTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.trend.length()").value(2));
     }
 
+    @Test
+    void sumsStoredUsdChildValuesWhenDisplayCurrencyIsRequested() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "hfx");
+        long first = insertTx(statement, account, "2026-03-10", "-100", "EXPENSE", null, "Shop");
+        long second = insertTx(statement, account, "2026-03-20", "-70", "EXPENSE", null, "Shop");
+        insertAmount(first, "USD", "-25");
+        insertAmount(second, "USD", "-17.5");
+
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31")
+                        .param("displayCurrency", "USD"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseCurrency").value("USD"))
+                .andExpect(jsonPath("$.totals.expense").value(42.5))
+                .andExpect(jsonPath("$.totals.net").value(-42.5));
+    }
+
+    @Test
+    void categoryTransactionsReturnsOnlyThatCategorysRows() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "hct");
+        long groceries = insertCategory("Groceries");
+        long other = insertCategory("Other");
+        insertTx(statement, account, "2026-03-10", "-100", "EXPENSE", groceries, "Example Store");
+        insertTx(statement, account, "2026-03-11", "-50", "EXPENSE", groceries, "Example Store");
+        insertTx(statement, account, "2026-03-12", "-300", "EXPENSE", other, "Shop");
+
+        mockMvc.perform(get("/api/v1/statistics/categories/" + groceries + "/transactions")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseCurrency").value("PLN"))
+                .andExpect(jsonPath("$.points.length()").value(2))
+                .andExpect(jsonPath("$.points[0].date").value("2026-03-10"))
+                .andExpect(jsonPath("$.points[0].amount").value(-100.0))
+                .andExpect(jsonPath("$.points[1].date").value("2026-03-11"))
+                .andExpect(jsonPath("$.points[1].amount").value(-50.0));
+
+        mockMvc.perform(get("/api/v1/statistics/categories/9999/transactions"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void categoryTrendBucketsByGranularity() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "hct2");
+        long groceries = insertCategory("Groceries");
+        insertTx(statement, account, "2026-03-10", "-100", "EXPENSE", groceries, "Example Store");
+        insertTx(statement, account, "2026-03-11", "-50", "EXPENSE", groceries, "Example Store");
+
+        mockMvc.perform(get("/api/v1/statistics/categories/" + groceries + "/trend")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31")
+                        .param("granularity", "month"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseCurrency").value("PLN"))
+                .andExpect(jsonPath("$.trend.length()").value(1))
+                .andExpect(jsonPath("$.trend[0].expense").value(150.0));
+    }
+
     private long insertAccount(String currency, String kind) {
         return jdbcTemplate.queryForObject("""
                 insert into account (name, currency, kind, account_number)
@@ -203,13 +271,21 @@ class StatisticsApiTest extends AbstractIntegrationTest {
                 """, Long.class, accountId, hash);
     }
 
-    private void insertTx(long statementId, long accountId, String date, String amount, String nature,
+    private long insertTx(long statementId, long accountId, String date, String amount, String nature,
                           Long categoryId, String merchant) {
-        jdbcTemplate.update("""
+        long id = jdbcTemplate.queryForObject("""
                 insert into transaction (statement_id, account_id, transaction_date, amount,
-                    currency, nature, category_id, merchant, base_amount)
-                values (?, ?, ?, ?, 'PLN', ?, ?, ?, ?)
-                """, statementId, accountId, Date.valueOf(LocalDate.parse(date)),
-                new BigDecimal(amount), nature, categoryId, merchant, new BigDecimal(amount));
+                    currency, nature, category_id, merchant)
+                values (?, ?, ?, ?, 'PLN', ?, ?, ?) returning id
+                """, Long.class, statementId, accountId, Date.valueOf(LocalDate.parse(date)),
+                new BigDecimal(amount), nature, categoryId, merchant);
+        insertAmount(id, "PLN", amount);
+        return id;
+    }
+
+    private void insertAmount(long transactionId, String currency, String amount) {
+        jdbcTemplate.update("""
+                insert into transaction_amount (transaction_id, currency, amount) values (?, ?, ?)
+                """, transactionId, currency, new BigDecimal(amount));
     }
 }

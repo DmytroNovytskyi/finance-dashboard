@@ -93,6 +93,30 @@ class TransactionEditApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void uncategorizeAllClearsEveryCategorizedRow() throws Exception {
+        long accountId = createAccount("PLN");
+        long statementId = createStatement(accountId, "h-uncat");
+        long tx = insertTransaction(statementId, accountId, LocalDate.of(2026, 8, 5),
+                "-12.00", "PLN", "EXPENSE", "Bus");
+        long categoryId = createCategory("Food");
+        mockMvc.perform(patch("/api/v1/transactions/{id}", tx)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"categoryId": %d}
+                                """.formatted(categoryId)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/transactions/uncategorize-all"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        mockMvc.perform(get("/api/v1/transactions").param("categoryId", String.valueOf(categoryId)))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(get("/api/v1/transactions").param("uncategorized", "true"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
     void bulkAssignsAndClearsCategory() throws Exception {
         long accountId = createAccount("PLN");
         long statementId = createStatement(accountId, "h3");

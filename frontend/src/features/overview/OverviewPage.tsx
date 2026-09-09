@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import Alert from '@mui/material/Alert'
@@ -6,26 +6,69 @@ import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Grid from '@mui/material/Grid'
-import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import Paper from '@mui/material/Paper'
-import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { queryKeys } from '../../api/keys'
 import { statisticsApi } from '../../api/endpoints'
 import { buildQuery } from '../../api/client'
-import { rangeForPreset, type DateRange, type DateRangePreset } from '../../lib/date'
+import { DATE_RANGE_PRESETS, rangeForPreset, type DateRange, type DateRangePreset } from '../../lib/date'
 import { amountColor, useScheme } from '../../theme'
 import { formatInteger, formatMoney, formatMoneyMagnitude, formatTrendBucket } from '../../lib/format'
 import { ChartCard } from '../../components/ChartCard'
 import type { StatisticsGranularity, StatisticsTrendPoint, TransactionNature } from '../../types'
 import { CategoryDonut, type DonutRow } from './CategoryDonut'
+import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
 import { PeriodSelector } from './PeriodSelector'
 import { TopMerchantsChart } from './TopMerchantsChart'
-import { TrendChart, TrendControls } from './TrendChart'
+import { TREND_GRANULARITIES, TrendChart, TrendControls } from './TrendChart'
+
+const OVERVIEW_STORAGE_KEY = 'finance-dashboard.overview.v1'
+const PRESET_VALUES: DateRangePreset[] = [...DATE_RANGE_PRESETS.map((option) => option.value), 'custom']
+const DEFAULT_PERIOD: PeriodState = { preset: 'thisYear', range: rangeForPreset('thisYear') }
+const DEFAULT_GRANULARITY: StatisticsGranularity = 'month'
 
 interface PeriodState {
   preset: DateRangePreset
   range: DateRange
+}
+
+interface StoredOverviewState {
+  preset?: unknown
+  from?: unknown
+  to?: unknown
+  granularity?: unknown
+}
+
+/** Restores the last period and granularity from the browser; currency is shared app-wide. */
+function loadOverviewState(): { period: PeriodState; granularity: StatisticsGranularity } {
+  const fallback = { period: DEFAULT_PERIOD, granularity: DEFAULT_GRANULARITY }
+  try {
+    const raw = window.localStorage.getItem(OVERVIEW_STORAGE_KEY)
+    if (!raw) return fallback
+    const stored = JSON.parse(raw) as StoredOverviewState
+    const granularity =
+      typeof stored.granularity === 'string' &&
+      (TREND_GRANULARITIES as readonly string[]).includes(stored.granularity)
+        ? (stored.granularity as StatisticsGranularity)
+        : DEFAULT_GRANULARITY
+    if (typeof stored.preset !== 'string' || !PRESET_VALUES.includes(stored.preset as DateRangePreset)) {
+      return { period: DEFAULT_PERIOD, granularity }
+    }
+    const preset = stored.preset as DateRangePreset
+    const period: PeriodState =
+      preset === 'custom'
+        ? {
+            preset,
+            range: {
+              from: typeof stored.from === 'string' ? stored.from : null,
+              to: typeof stored.to === 'string' ? stored.to : null,
+            },
+          }
+        : { preset, range: rangeForPreset(preset) }
+    return { period, granularity }
+  } catch {
+    return fallback
+  }
 }
 
 interface KpiTileProps {
@@ -67,16 +110,22 @@ function KpiTile({ label, value, color, onClick }: KpiTileProps) {
   )
 }
 
-function rangeParams(range: DateRange, granularity?: StatisticsGranularity) {
-  return { from: range.from ?? undefined, to: range.to ?? undefined, granularity }
+function rangeParams(range: DateRange, granularity?: StatisticsGranularity, displayCurrency?: DisplayCurrency) {
+  return {
+    from: range.from ?? undefined,
+    to: range.to ?? undefined,
+    granularity,
+    displayCurrency,
+  }
 }
 
 /** Dashboard: KPI tiles plus the bucketed trend, category donut, and top merchants. */
 export function OverviewPage() {
   const scheme = useScheme()
   const navigate = useNavigate()
-  const [period, setPeriod] = useState<PeriodState>({ preset: 'thisYear', range: rangeForPreset('thisYear') })
-  const [granularity, setGranularity] = useState<StatisticsGranularity>('month')
+  const { displayCurrency } = useDisplayCurrency()
+  const [period, setPeriod] = useState<PeriodState>(() => loadOverviewState().period)
+  const [granularity, setGranularity] = useState<StatisticsGranularity>(() => loadOverviewState().granularity)
   const [focus, setFocus] = useState<DateRange | null>(null)
 
   const changePeriod = (preset: DateRangePreset, range: DateRange) => {
@@ -88,15 +137,31 @@ export function OverviewPage() {
     setFocus(null)
   }
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        OVERVIEW_STORAGE_KEY,
+        JSON.stringify({
+          preset: period.preset,
+          from: period.range.from,
+          to: period.range.to,
+          granularity,
+        }),
+      )
+    } catch {
+      /* storage unavailable: keep the selection for this session only */
+    }
+  }, [period, granularity])
+
   const trendQuery = useQuery({
-    queryKey: queryKeys.statistics.summary(rangeParams(period.range, granularity)),
-    queryFn: () => statisticsApi.summary(rangeParams(period.range, granularity)),
+    queryKey: queryKeys.statistics.summary(rangeParams(period.range, granularity, displayCurrency)),
+    queryFn: () => statisticsApi.summary(rangeParams(period.range, granularity, displayCurrency)),
     placeholderData: keepPreviousData,
   })
   const overviewRange = focus ?? period.range
   const overviewQuery = useQuery({
-    queryKey: queryKeys.statistics.summary(rangeParams(overviewRange)),
-    queryFn: () => statisticsApi.summary(rangeParams(overviewRange)),
+    queryKey: queryKeys.statistics.summary(rangeParams(overviewRange, undefined, displayCurrency)),
+    queryFn: () => statisticsApi.summary(rangeParams(overviewRange, undefined, displayCurrency)),
     placeholderData: keepPreviousData,
   })
 
@@ -133,21 +198,12 @@ export function OverviewPage() {
         </Typography>
       </Box>
 
-      <PeriodSelector preset={period.preset} range={period.range} onChange={changePeriod} />
+      <Box sx={{ minWidth: 320 }}>
+        <PeriodSelector preset={period.preset} range={period.range} onChange={changePeriod} />
+      </Box>
 
       {overviewQuery.isError ? (
         <Alert severity="error">Could not load the statistics. Check that the backend is running.</Alert>
-      ) : null}
-
-      {(overviewQuery.data?.unconverted ?? 0) > 0 ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          <Tooltip title="Rows in a foreign currency for which no NBP rate was available when imported. They are not counted in the money figures.">
-            <InfoOutlined fontSize="small" sx={{ color: 'text.secondary' }} />
-          </Tooltip>
-          <Typography variant="caption" color="text.secondary">
-            {formatInteger(overviewQuery.data?.unconverted ?? 0)} transactions have no FX rate and aren&apos;t in the money figures.
-          </Typography>
-        </Box>
       ) : null}
 
       <Box
@@ -160,22 +216,24 @@ export function OverviewPage() {
           pointerEvents: trendQuery.isPlaceholderData || overviewQuery.isPlaceholderData ? 'none' : 'auto',
         }}
       >
-        {focus ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Showing
-            </Typography>
-            <Chip
-              label={formatTrendBucket(focus.from ?? '', granularity)}
-              onDelete={() => setFocus(null)}
-              size="small"
-              variant="outlined"
-            />
-            <Typography variant="body2" color="text.secondary">
-              in the donut and merchants; the trend keeps the full period.
-            </Typography>
-          </Box>
-        ) : null}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minHeight: 32, flexWrap: 'wrap' }}>
+          {focus ? (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+              <Typography variant="body2" color="text.secondary">
+                Showing
+              </Typography>
+              <Chip
+                label={formatTrendBucket(focus.from ?? '', granularity)}
+                onDelete={() => setFocus(null)}
+                size="small"
+                variant="outlined"
+              />
+              <Typography variant="caption" color="text.secondary">
+                in the donut &amp; merchants; the trend keeps the full period.
+              </Typography>
+            </Box>
+          ) : null}
+        </Box>
 
         <Grid container spacing={2}>
           {totals ? (

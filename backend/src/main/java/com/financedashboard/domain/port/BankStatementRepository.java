@@ -13,11 +13,17 @@ public interface BankStatementRepository {
     /** Returns all statements, most recently imported first. */
     List<BankStatement> findAllByOrderByImportedAtDesc();
 
+    /** Returns all statements attributed to the account with the given id. */
+    List<BankStatement> findByAccountId(Long accountId);
+
     /** Returns the statement with the given id, if present. */
     Optional<BankStatement> findById(Long id);
 
     /** Returns whether a statement with the given file hash was already imported. */
     boolean existsByFileHash(String fileHash);
+
+    /** Returns whether any statement belongs to the account with the given id. */
+    boolean existsByAccountId(Long accountId);
 
     /** Deletes the statement with the given id. */
     void deleteById(Long id);

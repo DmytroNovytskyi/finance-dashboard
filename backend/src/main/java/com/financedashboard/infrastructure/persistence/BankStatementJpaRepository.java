@@ -10,7 +10,11 @@ public interface BankStatementJpaRepository extends JpaRepository<BankStatementE
 
     List<BankStatementEntity> findAllByOrderByImportedAtDesc();
 
+    List<BankStatementEntity> findByAccountIdOrderByImportedAtDesc(Long accountId);
+
     boolean existsByFileHash(String fileHash);
+
+    boolean existsByAccountId(Long accountId);
 
     Optional<BankStatementEntity> findByFileHash(String fileHash);
 }

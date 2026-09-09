@@ -1,6 +1,7 @@
 package com.financedashboard.web.exception;
 
 import com.financedashboard.application.exception.NotFoundException;
+import com.financedashboard.domain.exception.StatementFxRateException;
 import com.financedashboard.domain.exception.StatementParseException;
 import com.financedashboard.domain.exception.UnsupportedStatementException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +40,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleStatementParse(
             StatementParseException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(StatementFxRateException.class)
+    public ResponseEntity<ApiError> handleStatementFxRate(
+            StatementFxRateException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

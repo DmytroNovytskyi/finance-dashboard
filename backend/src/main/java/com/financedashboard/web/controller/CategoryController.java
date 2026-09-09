@@ -1,6 +1,8 @@
 package com.financedashboard.web.controller;
 
 import com.financedashboard.application.CategoryService;
+import com.financedashboard.application.TransactionEditService;
+import com.financedashboard.web.dto.BulkCountResponse;
 import com.financedashboard.web.dto.CategoryCreateRequest;
 import com.financedashboard.web.dto.CategoryResponse;
 import com.financedashboard.web.dto.CategoryUpdateRequest;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CategoryController {
 
     private final CategoryService categories;
+    private final TransactionEditService edit;
 
     @GetMapping
     public List<CategoryResponse> list() {
@@ -51,5 +54,15 @@ public class CategoryController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         categories.delete(id);
+    }
+
+    /**
+     * Clears this category from its transactions, keeping the category itself. Internal transfers
+     * (which carry the reserved system category) are untouched.
+     */
+    @PostMapping("/{id}/uncategorize")
+    public BulkCountResponse uncategorize(@PathVariable Long id) {
+        categories.get(id);
+        return new BulkCountResponse(edit.uncategorizeByCategory(id));
     }
 }

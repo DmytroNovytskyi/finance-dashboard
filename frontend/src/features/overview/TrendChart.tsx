@@ -50,6 +50,10 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
   if (data.length === 0) {
     return <EmptyState title="No income or expenses in this period" hint="Pick a wider period to see the trend." />
   }
+  // With many buckets (day/week over a long range) each cell is a few pixels wide, so sub-pixel
+  // bars vanish; let them fill the cell to read as a continuous silhouette. With few buckets keep
+  // a visible gap so the income/expense pair reads as bars.
+  const dense = data.length > 48
 
   // Category cells are evenly spaced across the plot after the fixed-width y axis, so a click
   // anywhere in a cell (not just on the bar) maps to that bucket.
@@ -71,7 +75,7 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
   return (
     <div ref={plotRef} onMouseDown={onPlotMouseDown} style={{ width: '100%', height: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={2} barCategoryGap="35%">
+        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={dense ? 0 : 2} barCategoryGap={dense ? '2%' : '6%'}>
           <CartesianGrid vertical={false} stroke={ink.grid} />
           <XAxis
             dataKey="start"
@@ -88,9 +92,13 @@ export function TrendChart({ data, baseCurrency, granularity, onSelect }: TrendC
             tickLine={false}
             width={46}
           />
-          <Tooltip content={<TrendTooltip baseCurrency={baseCurrency} />} />
-          <Bar dataKey="income" name="Income" fill={colors.income} maxBarSize={16} radius={[4, 4, 0, 0]} />
-          <Bar dataKey="expense" name="Expense" fill={colors.expense} maxBarSize={16} radius={[4, 4, 0, 0]} />
+          <Tooltip
+            content={<TrendTooltip baseCurrency={baseCurrency} />}
+            cursor={{ fill: ink.grid, opacity: 0.35 }}
+            wrapperStyle={{ visibility: 'hidden', pointerEvents: 'none' }}
+          />
+          <Bar dataKey="income" name="Income" fill={colors.income} radius={[4, 4, 0, 0]} activeBar={false} isAnimationActive={false} />
+          <Bar dataKey="expense" name="Expense" fill={colors.expense} radius={[4, 4, 0, 0]} activeBar={false} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>

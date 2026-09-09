@@ -1,5 +1,6 @@
 package com.financedashboard.web.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -21,6 +22,14 @@ class MerchantRuleApiTest extends AbstractIntegrationTest {
     private long insertCategory(String name) {
         return jdbcTemplate.queryForObject(
                 "insert into category (name) values (?) returning id", Long.class, name);
+    }
+
+    private long insertTransaction(long statementId, long accountId, String merchant, long categoryId) {
+        return jdbcTemplate.queryForObject("""
+                insert into transaction (statement_id, account_id, transaction_date, amount,
+                        currency, nature, description, merchant, category_id)
+                values (?, ?, date '2026-03-05', -100.00, 'PLN', 'EXPENSE', 'op', ?, ?) returning id
+                """, Long.class, statementId, accountId, merchant, categoryId);
     }
 
     private long createRule(String merchant, long categoryId) throws Exception {
@@ -89,6 +98,36 @@ class MerchantRuleApiTest extends AbstractIntegrationTest {
                                 {"merchant":"Some","categoryId":424242}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void clearAllDeletesRulesAndRevertsTransactionsThatUsedThem() throws Exception {
+        long categoryId = insertCategory("Taxes");
+        long otherId = insertCategory("Other");
+        long accountId = jdbcTemplate.queryForObject(
+                "insert into account (name, currency) values ('Personal PLN', 'PLN') returning id",
+                Long.class);
+        long statementId = jdbcTemplate.queryForObject(
+                "insert into bank_statement (account_id, bank, file_hash) values (?, 'PEKAO', 'h-clear') returning id",
+                Long.class, accountId);
+        long used = insertTransaction(statementId, accountId, "Example Merchant", categoryId);
+        long notUsed = insertTransaction(statementId, accountId, "Example Merchant", otherId);
+
+        createRule("Example Merchant", categoryId);
+
+        mockMvc.perform(delete("/api/v1/merchant-rules"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rulesRemoved").value(1))
+                .andExpect(jsonPath("$.transactionsUncategorized").value(1));
+
+        String ruleCategory = jdbcTemplate.queryForObject(
+                "select category_id from transaction where id = ?", String.class, used);
+        String keptCategory = jdbcTemplate.queryForObject(
+                "select category_id from transaction where id = ?", String.class, notUsed);
+        assertThat(ruleCategory).isNull();
+        assertThat(keptCategory).isEqualTo(String.valueOf(otherId));
+        mockMvc.perform(get("/api/v1/merchant-rules"))
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

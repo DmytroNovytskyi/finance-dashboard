@@ -26,6 +26,6 @@ public abstract class AbstractIntegrationTest {
     @BeforeEach
     void resetDatabase() {
         jdbcTemplate.execute(
-                "TRUNCATE transaction, bank_statement, fx_rate, account, category RESTART IDENTITY CASCADE");
+                "TRUNCATE transaction_amount, transaction, bank_statement, fx_rate, account, category RESTART IDENTITY CASCADE");
     }
 }

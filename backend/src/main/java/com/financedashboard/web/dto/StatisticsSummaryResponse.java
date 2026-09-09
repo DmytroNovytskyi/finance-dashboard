@@ -14,8 +14,7 @@ public record StatisticsSummaryResponse(
         List<Monthly> byMonth,
         List<Category> byCategory,
         List<Merchant> topMerchants,
-        List<TrendPoint> trend,
-        long unconverted) {
+        List<TrendPoint> trend) {
 
     public static StatisticsSummaryResponse from(Summary s) {
         return new StatisticsSummaryResponse(
@@ -26,8 +25,7 @@ public record StatisticsSummaryResponse(
                 s.byMonth().stream().map(Monthly::from).toList(),
                 s.byCategory().stream().map(Category::from).toList(),
                 s.topMerchants().stream().map(Merchant::from).toList(),
-                s.trend().stream().map(TrendPoint::from).toList(),
-                s.unconverted());
+                s.trend().stream().map(TrendPoint::from).toList());
     }
 
     /** API representation of the aggregate totals. */

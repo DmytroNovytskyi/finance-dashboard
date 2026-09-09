@@ -50,7 +50,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
     }
   }
 
-  const mutationError = (create.error ?? applyOne.error) as Error | null
+  const mutationError = (create.error ?? applyOne.error ?? remove.error) as Error | null
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
@@ -59,7 +59,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           Defaults by counterparty
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Auto-tag future imports. Apply each default to its matching history.
+          Auto-tag future imports. Deleting a default also un-categorizes the rows it tagged.
         </Typography>
       </Box>
 
@@ -92,7 +92,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
                 <IconButton size="small" title="Apply to matching history" onClick={() => runApply(rule.id, rule.merchant)} aria-label={`Apply default for ${rule.merchant}`}>
                   <PlayArrow fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => remove.mutate(rule.id)} aria-label={`Delete default for ${rule.merchant}`}>
+                <IconButton size="small" onClick={() => remove.mutate(rule.id)} title="Delete: stops auto-tagging and un-categorizes matching rows" aria-label={`Delete default for ${rule.merchant}`}>
                   <Delete fontSize="small" />
                 </IconButton>
               </Box>

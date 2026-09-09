@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import type { Account, Category } from '../types'
 import { categoricalPalette, useScheme } from '../theme'
-import { accountsApi, categoriesApi } from './endpoints'
+import { accountsApi, categoriesApi, transfersApi } from './endpoints'
 import { queryKeys } from './keys'
 
 /** All accounts, ordered as the backend returns them. */
@@ -34,6 +34,11 @@ function orderCategories(categories: Category[], scheme: 'light' | 'dark'): Cate
     color: category.color ?? categoricalPalette[scheme][index % categoricalPalette[scheme].length],
     system: category.system,
   }))
+}
+
+/** Own-account transfer pairs the matcher detected but are not yet internal transfers. */
+export function useTransferSuggestions() {
+  return useQuery({ queryKey: queryKeys.transfers, queryFn: transfersApi.suggestions })
 }
 
 export interface AccountPresentation {

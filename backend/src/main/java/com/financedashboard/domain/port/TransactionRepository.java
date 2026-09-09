@@ -3,6 +3,7 @@ package com.financedashboard.domain.port;
 import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionFilter;
+import com.financedashboard.domain.transaction.TransactionOrder;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -42,8 +43,14 @@ public interface TransactionRepository {
     /** Returns whether any transaction belongs to the statement with the given id. */
     boolean existsByStatementId(Long statementId);
 
+    /** Returns whether any transaction belongs to the account with the given id. */
+    boolean existsByAccountId(Long accountId);
+
     /** Returns all transactions that belong to the statement with the given id. */
     List<Transaction> findByStatementId(Long statementId);
+
+    /** Returns all transactions of the account with the given id, oldest first. */
+    List<Transaction> findByAccountId(Long accountId);
 
     /**
      * Returns the number of stored transactions per statement, keyed by statement id. Statements
@@ -53,6 +60,9 @@ public interface TransactionRepository {
 
     /** Deletes the given transactions. */
     void deleteAll(Collection<Transaction> transactions);
+
+    /** Returns all transactions, oldest first. Used by the multi-currency backfill. */
+    List<Transaction> findAll();
 
     /** Returns all transactions that are not internal transfers, oldest first. */
     List<Transaction> findAllNonTransfers();
@@ -64,8 +74,20 @@ public interface TransactionRepository {
     List<Transaction> findUncategorized();
 
     /**
+     * Returns transactions that carry a category and are not internal transfers, oldest first.
+     * Candidates for the bulk "clear category" actions.
+     */
+    List<Transaction> findCategorized();
+
+    /**
      * Returns one page of transactions matching {@code filter}, ordered by transaction date
      * descending then id descending.
      */
     PagedTransactions search(TransactionFilter filter, int page, int size);
+
+    /**
+     * Returns one page of transactions matching {@code filter}, ordered by {@code order}; id
+     * descending is always the tie-breaker.
+     */
+    PagedTransactions search(TransactionFilter filter, int page, int size, TransactionOrder order);
 }

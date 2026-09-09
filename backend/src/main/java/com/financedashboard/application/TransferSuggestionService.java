@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -89,6 +90,9 @@ public class TransferSuggestionService {
                         if (distance > MAX_DATE_DIFF_DAYS) {
                             continue;
                         }
+                        if (outbound.getCategoryId() != null && inbound.getCategoryId() != null) {
+                            continue;
+                        }
                         boolean mirror = ownCanonical != null && references(inbound.getDescription(), ownCanonical);
                         boolean equalSameCurrency = outbound.getCurrency().equals(inbound.getCurrency())
                                 && outbound.getAmount().abs().compareTo(inbound.getAmount().abs()) == 0;
@@ -125,6 +129,26 @@ public class TransferSuggestionService {
                 applied++;
             } catch (IllegalArgumentException | com.financedashboard.application.exception.NotFoundException ignored) {
                 // already paired or vanished since suggestion was computed
+            }
+        }
+        return applied;
+    }
+
+    /**
+     * Auto-applies, as internal transfers, the mirror pairs among the freshly imported rows whose
+     * legs are both still uncategorized. Import-completing a pair is then immediate, while a leg
+     * that already carries a category is left as a suggestion for manual review.
+     */
+    public int autoPairForImported(Collection<Long> freshIds, TransactionEditService transfers) {
+        int applied = 0;
+        for (SuggestedTransfer suggestion : suggest()) {
+            boolean touchesFresh = freshIds.contains(suggestion.fromTransactionId())
+                    || freshIds.contains(suggestion.toTransactionId());
+            if (!touchesFresh || !"MIRROR".equals(suggestion.reason())) {
+                continue;
+            }
+            if (transfers.pairIfBothUncategorized(suggestion.fromTransactionId(), suggestion.toTransactionId())) {
+                applied++;
             }
         }
         return applied;
