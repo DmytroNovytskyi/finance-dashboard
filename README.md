@@ -24,8 +24,8 @@ money goes.
 ```
 
 - The **frontend** serves the built app and proxies `/api` to the backend.
-- The **backend** imports bank statements (per-bank parsers), converts foreign-currency
-  amounts to a configurable base currency using official NBP rates, and answers statistics.
+- The **backend** imports bank statements (per-bank parsers) and values every transaction in
+  each supported currency at its own date using official NBP rates, then answers statistics.
 - **PostgreSQL** persists everything; its data directory is a bind mount on the deploy host.
 
 ## Tech stack
@@ -41,7 +41,7 @@ money goes.
 ## Prerequisites
 
 - Deployment: Docker with the Compose plugin.
-- Local development: JDK 21 and Node 20+ (Docker only for the database).
+- Local development: JDK 21, Node 20+, and Podman for the database.
 
 ## Deploy
 
@@ -63,10 +63,14 @@ repository.
 Start the database, then the two dev processes:
 
 ```bash
-docker compose up -d db            # needs a Compose file wiring the data/ dir
+podman start finance-db            # Postgres 18 on :5432,
 cd backend && ./gradlew bootRun    # API on http://localhost:8080
 cd frontend && npm run dev         # dev server on http://localhost:5173, proxies /api
 ```
+
+The `finance-db` container is created once from the external Compose file that wires the
+`data/` directory; after that it is started per session as shown above. Podman's machine must
+be running first.
 
 ## API docs
 
@@ -75,10 +79,12 @@ http://localhost:8080/swagger-ui.html.
 
 ## How to import a statement
 
-1. Create an account (name + currency) via the UI or `POST /api/v1/accounts`.
-2. On the Import page choose that account and upload the bank statement PDF.
-3. Transactions are stored, foreign amounts are converted to the base currency, and the
+1. On the Import page upload one or more bank statement PDFs. The owning account is read from
+   each file — reused when it already exists, created automatically otherwise.
+2. Transactions are stored, each valued in every supported currency at its own date, and the
    statement is filed. Re-uploading the same file is a no-op.
+3. Switch the display currency on the dashboard to read the same transactions in another
+   currency.
 
 ## Project layout
 
