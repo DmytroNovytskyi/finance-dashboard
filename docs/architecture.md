@@ -70,7 +70,10 @@ is not suggested; if any leg is uncategorized it stays a suggestion and both its
 Suggestions: `GET /api/v1/transfers/suggestions`, apply one pair `POST /api/v1/transfers`
 (`{fromTransactionId,toTransactionId}`), apply all `POST /api/v1/transfers/suggestions/apply`,
 and revert an applied transfer `POST /api/v1/transfers/{transactionId}/unlink` (both legs return
-to their natural income/expense and category).
+to their natural income/expense, with the category cleared). Unlinking — of a transfer or of a
+refund — does **not** restore a category a leg carried before it was linked: linking replaced that
+category with the reserved one, so unlink can only clear it. Categorize a pair after deciding it,
+not before.
 
 Refund detection and review: a refund candidate is an incoming row whose wording reverses a
 payment (`ANULOWANIE TRANSAKCJI`, `ZWROT ... TRANSAKCJI`), which is what keeps the tax office's
