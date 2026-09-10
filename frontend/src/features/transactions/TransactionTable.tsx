@@ -28,10 +28,12 @@ interface TransactionTableProps {
   /** Current server-side sort of the list (columns sort on the backend). */
   sort: TransactionSort
   onSortChange: (sort: TransactionSort) => void
+  /** Attach to the scrolling container; the page it lives on measures it to size each page. */
+  containerRef: (node: HTMLElement | null) => void
+  /** Rows one page holds, worked out from the space the container has. */
+  rowsPerPage: number
   page: number
-  size: number
   onPageChange: (page: number) => void
-  onSizeChange: (size: number) => void
   /** Ids of the legs of pending internal-transfer suggestions; those rows get an "Internal" tag. */
   suggestionIds: ReadonlySet<number>
   /** Ids of the legs of pending refund suggestions; those rows get a "Refund" tag. */
@@ -175,10 +177,10 @@ export function TransactionTable({
   categories,
   sort,
   onSortChange,
+  containerRef,
+  rowsPerPage,
   page,
-  size,
   onPageChange,
-  onSizeChange,
   suggestionIds,
   refundSuggestionIds,
   onCategoryChange,
@@ -200,15 +202,16 @@ export function TransactionTable({
     onClick: () => handleSort(key),
   })
 
-  const total = allRows.length
-  const visibleRows = allRows.slice(page * size, page * size + size)
+  const total = data?.totalElements ?? 0
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1)
+  const shownPage = Math.min(page, maxPage)
 
   return (
     <Paper
       variant="outlined"
       sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 140 }}
     >
-      <TableContainer sx={{ flex: 1, minHeight: 0 }}>
+      <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0 }}>
         <Table size="small" stickyHeader sx={{ minWidth: 860 }}>
           <TableHead>
             <TableRow>
@@ -237,7 +240,7 @@ export function TransactionTable({
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((transaction) => {
+              allRows.map((transaction) => {
                 const account = accounts.get(transaction.accountId)
                 const isSuggested = transaction.nature !== 'TRANSFER' && suggestionIds.has(transaction.id)
                 const isRefundSuggested =
@@ -281,15 +284,18 @@ export function TransactionTable({
           </TableBody>
         </Table>
       </TableContainer>
-      <TablePagination
-        component="div"
-        count={total}
-        page={page}
-        rowsPerPage={size}
-        rowsPerPageOptions={[25, 50, 100]}
-        onPageChange={(_, nextPage) => onPageChange(nextPage)}
-        onRowsPerPageChange={(event) => onSizeChange(Number(event.target.value))}
-      />
+      {total > rowsPerPage ? (
+        <TablePagination
+          component="div"
+          count={total}
+          page={shownPage}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[]}
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
+          onPageChange={(_, nextPage) => onPageChange(nextPage)}
+          sx={{ flexShrink: 0 }}
+        />
+      ) : null}
     </Paper>
   )
 }

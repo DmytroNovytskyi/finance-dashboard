@@ -22,6 +22,7 @@ import type { RefundSuggestion, TransferSuggestion } from '../../types'
 import { PageHeader, PageShell } from '../../components/PageLayout'
 import { useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
+import { useFittingRows } from '../../hooks/useFittingRows'
 import { RefundSuggestionRow, TransferSuggestionRow } from './SuggestionRows'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
@@ -35,9 +36,11 @@ import {
   type TxFilters,
 } from './model'
 
+/** Page size used until the table has been measured and can say how many rows it has room for. */
 const DEFAULT_PAGE_SIZE = 50
-/** Row cap for a single list request; the table sorts and paginates this full set in the browser. */
-const FULL_LIST_SIZE = 10_000
+
+/** Height of the pagination bar, taken out of the table so the bar appearing never shifts the fit. */
+const PAGINATION_HEIGHT = 52
 
 /** Transactions list with filters, overview drill-down, and delete-by-range. */
 export function TransactionsPage() {
@@ -73,14 +76,28 @@ export function TransactionsPage() {
   }
 
   const queryParams = useMemo(
-    () => toListParams({ ...filters, q: appliedQ }, 0, FULL_LIST_SIZE, sort),
-    [filters, appliedQ, sort],
+    () => toListParams({ ...filters, q: appliedQ }, page, size, sort),
+    [filters, appliedQ, page, size, sort],
   )
   const listQuery = useQuery({
     queryKey: queryKeys.transactions.list(queryParams),
     queryFn: () => transactionsApi.list(queryParams),
     placeholderData: keepPreviousData,
   })
+
+  const totalElements = listQuery.data?.totalElements ?? 0
+  const { containerRef, rows: rowsPerPage } = useFittingRows(totalElements, {
+    rowSelector: 'tbody tr',
+    reservedSelector: 'thead',
+    paginationSelector: '.MuiTablePagination-root',
+    paginationHeight: PAGINATION_HEIGHT,
+  })
+
+  useEffect(() => {
+    if (rowsPerPage === size) return
+    setSize(rowsPerPage)
+    setPage(0)
+  }, [rowsPerPage, size])
 
   const suggestionsQuery = useTransferSuggestions()
   const suggestionIds = useMemo(() => {
@@ -260,13 +277,10 @@ export function TransactionsPage() {
             categories={categories}
             sort={sort}
             onSortChange={changeSort}
+            containerRef={containerRef}
+            rowsPerPage={rowsPerPage}
             page={page}
-            size={size}
             onPageChange={setPage}
-            onSizeChange={(nextSize) => {
-              setSize(nextSize)
-              setPage(0)
-            }}
             suggestionIds={suggestionIds}
             refundSuggestionIds={refundSuggestionIds}
             onCategoryChange={changeCategory}
