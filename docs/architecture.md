@@ -91,6 +91,7 @@ views. Both accept the shared `displayCurrency` (selecting which stored per-tran
 summed) and 404 for an unknown category.
 
 Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}`,
+`POST /api/v1/merchant-rules/{id}/unlink` (keeps the rule, reverts its rows),
 `POST /api/v1/merchant-rules/{id}/apply` (one rule), and `POST /api/v1/merchant-rules/apply`
 (all rules). A rule maps a counterparty (matched exactly, case- and spacing-insensitively) to a
 category; statement imports auto-tag matching fresh rows, and the apply actions tag the
@@ -99,7 +100,9 @@ its category) stops auto-tagging and **reverts** to uncategorized the rows it ha
 merchant and the rule's category). Deleting a category removes its rules.
 
 Unlink actions: `POST /api/v1/categories/{id}/uncategorize` clears that category from its
-transactions (keeping the category), and `POST /api/v1/transactions/categorize` bulk-assigns a
+transactions (keeping the category); `POST /api/v1/merchant-rules/{id}/unlink` clears the rows a
+default tagged (reverting them to uncategorized) while keeping the default itself, so it still
+auto-tags future imports; and `POST /api/v1/transactions/categorize` bulk-assigns a
 category to listed rows. `POST /api/v1/transactions/uncategorize-all` clears the category of every
 categorized non-transfer row (internal transfers keep their reserved tag). Accounts can be removed
 wholesale with `DELETE /api/v1/accounts/{id}`, which deletes the account, its statements, and all

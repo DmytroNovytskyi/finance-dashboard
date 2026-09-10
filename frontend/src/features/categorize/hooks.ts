@@ -103,6 +103,15 @@ export function useDeleteMerchantRule() {
   })
 }
 
+/** Clears a default from the rows it tagged while keeping the default itself. */
+export function useUnlinkMerchantRule() {
+  const invalidate = useInvalidate(queryKeys.merchantRules, queryKeys.transactions.root, queryKeys.statistics.root)
+  return useMutation({
+    mutationFn: (id: number) => merchantRulesApi.unlink(id),
+    onSuccess: invalidate,
+  })
+}
+
 /** Applies one default to the uncategorized rows that match its counterparty. */
 export function useApplyMerchantRule() {
   const invalidate = useInvalidate(queryKeys.transactions.root, queryKeys.statistics.root)

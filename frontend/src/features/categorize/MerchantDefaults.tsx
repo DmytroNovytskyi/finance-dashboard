@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Add from '@mui/icons-material/Add'
 import Delete from '@mui/icons-material/Delete'
+import LinkOff from '@mui/icons-material/LinkOff'
 import PlayArrow from '@mui/icons-material/PlayArrow'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -13,7 +14,13 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { uncategorizedColor, useScheme } from '../../theme'
-import { useApplyMerchantRule, useCreateMerchantRule, useDeleteMerchantRule, useMerchantRules } from './hooks'
+import {
+  useApplyMerchantRule,
+  useCreateMerchantRule,
+  useDeleteMerchantRule,
+  useMerchantRules,
+  useUnlinkMerchantRule,
+} from './hooks'
 
 interface MerchantDefaultsProps {
   categories: CategoryPresentation[]
@@ -25,6 +32,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const rules = useMerchantRules()
   const create = useCreateMerchantRule()
   const remove = useDeleteMerchantRule()
+  const unlink = useUnlinkMerchantRule()
   const applyOne = useApplyMerchantRule()
 
   const [merchant, setMerchant] = useState('')
@@ -50,7 +58,14 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
     }
   }
 
-  const mutationError = (create.error ?? applyOne.error ?? remove.error) as Error | null
+  const runUnlink = (id: number, label: string) => {
+    unlink.mutate(id, {
+      onSuccess: (result) =>
+        setNotice(`Unlinked ${label} from ${result.count} row${result.count === 1 ? '' : 's'}.`),
+    })
+  }
+
+  const mutationError = (create.error ?? applyOne.error ?? unlink.error ?? remove.error) as Error | null
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
@@ -59,7 +74,8 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           Defaults by counterparty
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Auto-tag future imports. Deleting a default also un-categorizes the rows it tagged.
+          Auto-tag future imports. Unlinking clears the rows a default tagged but keeps it;
+          deleting also removes the default.
         </Typography>
       </Box>
 
@@ -91,6 +107,9 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
                 </Box>
                 <IconButton size="small" title="Apply to matching history" onClick={() => runApply(rule.id, rule.merchant)} aria-label={`Apply default for ${rule.merchant}`}>
                   <PlayArrow fontSize="small" />
+                </IconButton>
+                <IconButton size="small" onClick={() => runUnlink(rule.id, rule.merchant)} title="Unlink: clear the rows it tagged but keep this default" aria-label={`Unlink default for ${rule.merchant}`}>
+                  <LinkOff fontSize="small" />
                 </IconButton>
                 <IconButton size="small" onClick={() => remove.mutate(rule.id)} title="Delete: stops auto-tagging and un-categorizes matching rows" aria-label={`Delete default for ${rule.merchant}`}>
                   <Delete fontSize="small" />

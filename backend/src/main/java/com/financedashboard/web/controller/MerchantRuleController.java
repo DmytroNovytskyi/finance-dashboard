@@ -1,6 +1,7 @@
 package com.financedashboard.web.controller;
 
 import com.financedashboard.application.MerchantRuleService;
+import com.financedashboard.web.dto.BulkCountResponse;
 import com.financedashboard.web.dto.ClearDefaultsResponse;
 import com.financedashboard.web.dto.MerchantRuleApplyResponse;
 import com.financedashboard.web.dto.MerchantRuleCreateRequest;
@@ -46,6 +47,15 @@ public class MerchantRuleController {
     @PostMapping("/{id}/apply")
     public MerchantRuleApplyResponse applyOne(@PathVariable Long id) {
         return new MerchantRuleApplyResponse(rules.apply(id));
+    }
+
+    /**
+     * Clears this default from the transactions it tagged, keeping the default itself so it still
+     * tags future imports and can be re-applied to history later.
+     */
+    @PostMapping("/{id}/unlink")
+    public BulkCountResponse unlink(@PathVariable Long id) {
+        return new BulkCountResponse(rules.unlink(id));
     }
 
     @DeleteMapping("/{id}")

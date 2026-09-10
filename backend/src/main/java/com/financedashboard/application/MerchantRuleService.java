@@ -64,16 +64,34 @@ public class MerchantRuleService {
     }
 
     /**
+     * Un-links the rule with the given id while keeping it: the categorized, non-transfer
+     * transactions it tagged (same merchant and the rule's category) become uncategorized again,
+     * but the rule stays and keeps tagging future imports. Returns how many rows were reverted.
+     */
+    @Transactional
+    public int unlink(Long id) {
+        MerchantRule rule = rules.findById(id)
+                .orElseThrow(() -> new NotFoundException("Merchant rule " + id + " not found"));
+        return revertTagged(Map.of(rule.getMerchant(), rule.getCategoryId()));
+    }
+
+    /**
      * Deletes the rule with the given id and un-links it: the categorized, non-transfer
      * transactions that were tagged through it (same merchant and the rule's category) become
      * uncategorized again. Returns how many rows were reverted.
      */
     @Transactional
     public int delete(Long id) {
-        MerchantRule rule = rules.findById(id)
-                .orElseThrow(() -> new NotFoundException("Merchant rule " + id + " not found"));
+        int reverted = unlink(id);
         rules.deleteById(id);
-        Map<String, Long> categoryByMerchant = Map.of(rule.getMerchant(), rule.getCategoryId());
+        return reverted;
+    }
+
+    /**
+     * Uncategorizes every categorized, non-transfer transaction tagged through the given
+     * merchant-to-category links. Returns how many rows were reverted.
+     */
+    private int revertTagged(Map<String, Long> categoryByMerchant) {
         List<Transaction> reverted = transactions.findCategorized().stream()
                 .filter(transaction -> usesLink(transaction, categoryByMerchant))
                 .map(transaction -> transaction.toBuilder().categoryId(null).build())
@@ -100,14 +118,7 @@ public class MerchantRuleService {
         for (MerchantRule rule : all) {
             rules.deleteById(rule.getId());
         }
-        List<Transaction> reverted = transactions.findCategorized().stream()
-                .filter(transaction -> usesLink(transaction, categoryByMerchant))
-                .map(transaction -> transaction.toBuilder().categoryId(null).build())
-                .toList();
-        if (!reverted.isEmpty()) {
-            transactions.saveAll(reverted);
-        }
-        return new ClearAllResult(all.size(), reverted.size());
+        return new ClearAllResult(all.size(), revertTagged(categoryByMerchant));
     }
 
     private static boolean usesLink(Transaction transaction, Map<String, Long> categoryByMerchant) {

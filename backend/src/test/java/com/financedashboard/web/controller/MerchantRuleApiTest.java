@@ -131,6 +131,44 @@ class MerchantRuleApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void unlinkRevertsTaggedTransactionsAndKeepsTheDefault() throws Exception {
+        long categoryId = insertCategory("Taxes");
+        long otherId = insertCategory("Other");
+        long accountId = jdbcTemplate.queryForObject(
+                "insert into account (name, currency) values ('Personal PLN', 'PLN') returning id",
+                Long.class);
+        long statementId = jdbcTemplate.queryForObject(
+                "insert into bank_statement (account_id, bank, file_hash) values (?, 'PEKAO', 'h-unlink') returning id",
+                Long.class, accountId);
+        long used = insertTransaction(statementId, accountId, "Example Merchant", categoryId);
+        long otherCategory = insertTransaction(statementId, accountId, "Example Merchant", otherId);
+
+        long ruleId = createRule("Example Merchant", categoryId);
+
+        mockMvc.perform(post("/api/v1/merchant-rules/{id}/unlink", ruleId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select category_id from transaction where id = ?", String.class, used)).isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "select category_id from transaction where id = ?", String.class, otherCategory))
+                .isEqualTo(String.valueOf(otherId));
+        mockMvc.perform(get("/api/v1/merchant-rules"))
+                .andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(post("/api/v1/merchant-rules/{id}/apply", ruleId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applied").value(1));
+    }
+
+    @Test
+    void unlinkUnknownDefaultReturnsNotFound() throws Exception {
+        mockMvc.perform(post("/api/v1/merchant-rules/999999/unlink"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void applyWithoutMatchesReturnsZero() throws Exception {
         long categoryId = insertCategory("Taxes");
         long ruleId = createRule("No Such Merchant", categoryId);
