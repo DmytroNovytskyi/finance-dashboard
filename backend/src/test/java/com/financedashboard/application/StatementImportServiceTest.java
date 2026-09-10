@@ -15,6 +15,7 @@ import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementParser;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.FxRateProvider;
+import com.financedashboard.domain.port.FxRateProvider.FxRate;
 import com.financedashboard.domain.port.MerchantRuleRepository;
 import com.financedashboard.domain.port.TransactionAmountRepository;
 import com.financedashboard.domain.port.TransactionRepository;
@@ -63,10 +64,14 @@ class StatementImportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StatementImportService(
+        service = serviceWith("PLN");
+    }
+
+    private StatementImportService serviceWith(String... currencies) {
+        return new StatementImportService(
                 List.of(parser), statements, transactions, accounts, fxRates, merchantRules,
                 transferSuggestions, transactionEdit, transactionAmounts,
-                new SupportedCurrencies("PLN", List.of("PLN")));
+                new SupportedCurrencies("PLN", List.of(currencies)));
     }
 
     private ParsedStatement parsed(String accountNumber) {
@@ -185,6 +190,34 @@ class StatementImportServiceTest {
         TransactionAmount child = captor.getValue().get(0);
         assertThat(child.currency()).isEqualTo("PLN");
         assertThat(child.amount()).isEqualByComparingTo("-250.50");
+    }
+
+    @Test
+    void importValuesABaseCurrencyStatementInEverySupportedCurrency() {
+        StatementImportService multi = serviceWith("PLN", "USD");
+        when(parser.parse(any())).thenReturn(parsed("00000000000000000000000002"));
+        when(accounts.findByAccountNumber("00000000000000000000000002")).thenReturn(Optional.of(
+                Account.builder().id(1L).name("Pekao PLN").currency("PLN").build()));
+        stubParserAndStorage(1L);
+        when(fxRates.findRate("USD", LocalDate.of(2026, 3, 5)))
+                .thenReturn(Optional.of(new FxRate(new BigDecimal("4.0"), LocalDate.of(2026, 3, 5))));
+
+        multi.importStatement(new byte[] {1}, null, "wyciag.pdf");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<TransactionAmount>> captor = ArgumentCaptor.forClass(List.class);
+        verify(transactionAmounts).saveAll(captor.capture());
+        List<TransactionAmount> children = captor.getValue();
+        assertThat(children).hasSize(2);
+        assertThat(childIn(children, "PLN").amount()).isEqualByComparingTo("-250.50");
+        assertThat(childIn(children, "USD").amount()).isEqualByComparingTo("-62.625");
+    }
+
+    private TransactionAmount childIn(List<TransactionAmount> children, String currency) {
+        return children.stream()
+                .filter(child -> currency.equals(child.currency()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no " + currency + " value in " + children));
     }
 
     @Test

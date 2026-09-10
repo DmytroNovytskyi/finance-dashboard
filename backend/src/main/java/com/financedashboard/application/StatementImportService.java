@@ -181,8 +181,10 @@ public class StatementImportService {
                     children.add(new TransactionAmount(id, code, nativeAmount));
                     continue;
                 }
-                BigDecimal nativeToBase = ratePlan.get(new CodeDate(
-                        nativeCurrency.toUpperCase(java.util.Locale.ROOT), transaction.getTransactionDate()));
+                BigDecimal nativeToBase = base.equalsIgnoreCase(nativeCurrency)
+                        ? BigDecimal.ONE
+                        : ratePlan.get(new CodeDate(nativeCurrency.toUpperCase(java.util.Locale.ROOT),
+                                transaction.getTransactionDate()));
                 BigDecimal targetToBase = base.equals(code)
                         ? BigDecimal.ONE
                         : ratePlan.get(new CodeDate(code, transaction.getTransactionDate()));
