@@ -2,7 +2,7 @@
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 COPY . .
-RUN ./gradlew bootJar --no-daemon \
+RUN --mount=type=cache,target=/root/.gradle,sharing=locked ./gradlew bootJar --no-daemon \
     && mkdir /out \
     && cp "$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' | head -n 1)" /out/app.jar
 

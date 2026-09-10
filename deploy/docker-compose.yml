@@ -1,28 +1,38 @@
 # Template. Copy to the deploy host OUTSIDE the repo (sibling of data/), then fill .env.
 # Build contexts are relative to this file's location:
 #   ./app/... = the cloned repository, ./data = the external DB data directory.
+#
+# The db volume mounts /var/lib/postgresql, NOT /var/lib/postgresql/data. Postgres 18 sets
+# PGDATA=/var/lib/postgresql/18/docker and declares VOLUME /var/lib/postgresql, so mounting
+# the old path would leave the cluster in an anonymous volume that dies with the container.
+# Do not set PGDATA. The cluster lives at ./data/18/docker.
 services:
   db:
     image: postgres:18
+    container_name: finance-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: finance
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER:?DB_USER is required in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required in .env}
       TZ: ${TZ:-Europe/Warsaw}
     volumes:
-      - ./data:/var/lib/postgresql/data
+      - ./data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d finance"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${DB_USER} -d finance"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 60s
 
   backend:
     build: ./app/backend
+    container_name: finance-backend
+    restart: unless-stopped
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/finance
-      SPRING_DATASOURCE_USERNAME: ${DB_USER}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?DB_USER is required in .env}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required in .env}
       FINANCE_BASE_CURRENCY: ${FINANCE_BASE_CURRENCY:-PLN}
       TZ: ${TZ:-Europe/Warsaw}
     depends_on:
@@ -32,6 +42,8 @@ services:
 
   frontend:
     build: ./app/frontend
+    container_name: finance-frontend
+    restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-8100}:80"
     depends_on:
