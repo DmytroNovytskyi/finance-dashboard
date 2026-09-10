@@ -11,11 +11,26 @@ function useInvalidate(...keys: ReadonlyArray<readonly string[]>) {
   }
 }
 
-/** Uncategorized transactions of one nature (transfers are excluded by the nature filter). */
-export function useUncategorizedQueue(nature: 'EXPENSE' | 'INCOME') {
+/** Rows the queue fetches in one go; it pages them in the browser. */
+export const QUEUE_SIZE = 200
+
+/** Which rows the uncategorized queue shows; ALL leaves the nature unfiltered. */
+export type QueueNature = 'EXPENSE' | 'INCOME' | 'ALL'
+
+/**
+ * Uncategorized transactions. Transfers never appear: they always carry the reserved Internal
+ * Transfer category, so the uncategorized filter excludes them however the nature is set.
+ */
+export function useUncategorizedQueue(nature: QueueNature) {
+  const params = {
+    uncategorized: true,
+    nature: nature === 'ALL' ? undefined : nature,
+    page: 0,
+    size: QUEUE_SIZE,
+  }
   return useQuery({
-    queryKey: queryKeys.transactions.list({ uncategorized: true, nature, page: 0, size: 200 }),
-    queryFn: () => transactionsApi.list({ uncategorized: true, nature, page: 0, size: 200 }),
+    queryKey: queryKeys.transactions.list(params),
+    queryFn: () => transactionsApi.list(params),
   })
 }
 

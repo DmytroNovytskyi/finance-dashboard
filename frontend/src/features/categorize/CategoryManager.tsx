@@ -91,7 +91,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           <Box
             key={category.id}
             data-row="category"
-            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 44, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 40, py: 0.5, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
           >
             {category.system ? (
               <Box aria-hidden sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: category.color, flexShrink: 0 }} />

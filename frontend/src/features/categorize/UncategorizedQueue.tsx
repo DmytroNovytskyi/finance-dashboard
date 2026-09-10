@@ -17,18 +17,18 @@ import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
 import type { Transaction } from '../../types'
 import {
+  QUEUE_SIZE,
   useCategorizeBulk,
   useCategorizeOne,
   useCreateMerchantRule,
   useMerchantRules,
   useUncategorizedQueue,
+  type QueueNature,
 } from './hooks'
 
 interface UncategorizedQueueProps {
   categories: CategoryPresentation[]
 }
-
-const QUEUE_SIZE = 200
 
 function normalizeMerchant(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, ' ')
@@ -45,9 +45,9 @@ function RowAmount({ transaction }: { transaction: Transaction }) {
   )
 }
 
-/** Uncategorized rows of one nature, selectable for bulk assignment to a category. */
+/** Uncategorized rows, filtered by nature, selectable for bulk assignment to a category. */
 export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
-  const [nature, setNature] = useState<'EXPENSE' | 'INCOME'>('EXPENSE')
+  const [nature, setNature] = useState<QueueNature>('EXPENSE')
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
   const [remember, setRemember] = useState(false)
   const queue = useUncategorizedQueue(nature)
@@ -133,6 +133,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
         >
           <ToggleButton value="EXPENSE">Expenses</ToggleButton>
           <ToggleButton value="INCOME">Income</ToggleButton>
+          <ToggleButton value="ALL">All</ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
