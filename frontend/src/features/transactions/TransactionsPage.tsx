@@ -146,7 +146,16 @@ export function TransactionsPage() {
 
   const changeCategory = (id: number, categoryId: number | null) => categorizeOne.mutate({ id, categoryId })
 
-  const showRows = (ids: number[]) => navigate(`/transactions${buildQuery({ ids })}`)
+  /**
+   * Shows exactly the given rows. The filters are set here as well as written to the URL: the list
+   * only re-reads the URL when it changes, so navigating alone does nothing once the filters have
+   * been edited by hand — the address bar still holds the target and looks unchanged.
+   */
+  const showRows = (ids: number[]) => {
+    setFilters({ ...emptyFilters, ids })
+    setPage(0)
+    navigate(`/transactions${buildQuery({ ids })}`)
+  }
 
   const applyFilters = (next: TxFilters) => {
     setFilters(next)
