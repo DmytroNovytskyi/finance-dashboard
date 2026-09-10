@@ -25,4 +25,5 @@ public class Transaction {
     private final Long categoryId;
     private final String dedupHash;
     private final UUID transferGroupId;
+    private final UUID refundGroupId;
 }

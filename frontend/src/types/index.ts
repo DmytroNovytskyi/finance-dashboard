@@ -4,7 +4,7 @@
  */
 
 export type AccountKind = 'PERSONAL' | 'BUSINESS'
-export type TransactionNature = 'INCOME' | 'EXPENSE' | 'TRANSFER'
+export type TransactionNature = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'REFUND'
 
 /** Page-shaped response returned by list endpoints. */
 export interface PageResponse<T> {
@@ -190,4 +190,26 @@ export interface TransferPair {
   transferGroupId: string | null
   from: Transaction
   to: Transaction
+}
+
+/** One detected purchase-and-refund pair (not yet linked). */
+export interface RefundSuggestion {
+  purchaseTransactionId: number
+  refundTransactionId: number
+  accountId: number
+  amount: number
+  currency: string
+  /** The purchase's merchant, for display; null when the imported row carries none. */
+  merchant: string | null
+  purchaseDate: string
+  refundDate: string
+  /** ANCHORED when the bank's own wording named the purchase, AMOUNT when only the sum matched. */
+  reason: 'ANCHORED' | 'AMOUNT'
+}
+
+/** The purchase and the refund of an applied pair. */
+export interface RefundPair {
+  refundGroupId: string | null
+  purchase: Transaction
+  refund: Transaction
 }

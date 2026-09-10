@@ -34,14 +34,65 @@ interface TransactionTableProps {
   onSizeChange: (size: number) => void
   /** Ids of the legs of pending internal-transfer suggestions; those rows get an "Internal" tag. */
   suggestionIds: ReadonlySet<number>
+  /** Ids of the legs of pending refund suggestions; those rows get a "Refund" tag. */
+  refundSuggestionIds: ReadonlySet<number>
   onCategoryChange: (id: number, categoryId: number | null) => void
   onUnlink: (id: number) => void
+  onUnlinkRefund: (id: number) => void
+}
+
+/** The bordered tag that marks a row as part of a detected pair. */
+function PairTag({ label }: { label: string }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        typography: 'caption',
+        fontWeight: 600,
+        color: 'text.secondary',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+        px: 0.75,
+        py: 0,
+        mr: 1,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </Box>
+  )
+}
+
+/** Fixed label plus an undo button, for rows whose category the pairing has taken over. */
+function PairedCategoryCell({
+  label,
+  action,
+  onUnlink,
+}: {
+  label: string
+  action: string
+  onUnlink: () => void
+}) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Tooltip title={action}>
+        <IconButton size="small" aria-label={action} onClick={onUnlink}>
+          <Undo fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  )
 }
 
 function AmountCell({ transaction }: { transaction: Transaction }) {
   const scheme = useScheme()
   const colors = amountColor[scheme]
-  const color = transaction.nature === 'TRANSFER' ? 'text.disabled' : transaction.amount >= 0 ? colors.income : colors.expense
+  const excluded = transaction.nature === 'TRANSFER' || transaction.nature === 'REFUND'
+  const color = excluded ? 'text.disabled' : transaction.amount >= 0 ? colors.income : colors.expense
   return (
     <Typography
       variant="body2"
@@ -59,24 +110,30 @@ function CategoryCell({
   categories,
   onCategoryChange,
   onUnlink,
+  onUnlinkRefund,
 }: {
   transaction: Transaction
   categories: CategoryPresentation[]
   onCategoryChange: (id: number, categoryId: number | null) => void
   onUnlink: (id: number) => void
+  onUnlinkRefund: (id: number) => void
 }) {
   if (transaction.nature === 'TRANSFER') {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <Typography variant="body2" color="text.secondary">
-          Internal Transfer
-        </Typography>
-        <Tooltip title="Revert to a normal expense/income">
-          <IconButton size="small" aria-label="Revert transfer" onClick={() => onUnlink(transaction.id)}>
-            <Undo fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
+      <PairedCategoryCell
+        label="Internal Transfer"
+        action="Revert transfer to a normal expense/income"
+        onUnlink={() => onUnlink(transaction.id)}
+      />
+    )
+  }
+  if (transaction.nature === 'REFUND') {
+    return (
+      <PairedCategoryCell
+        label="Refund"
+        action="Unlink the refund from its purchase"
+        onUnlink={() => onUnlinkRefund(transaction.id)}
+      />
     )
   }
   const editable = categories.filter((category) => !category.system)
@@ -123,8 +180,10 @@ export function TransactionTable({
   onPageChange,
   onSizeChange,
   suggestionIds,
+  refundSuggestionIds,
   onCategoryChange,
   onUnlink,
+  onUnlinkRefund,
 }: TransactionTableProps) {
   const allRows = data?.content ?? []
 
@@ -147,7 +206,7 @@ export function TransactionTable({
   return (
     <Paper
       variant="outlined"
-      sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 240 }}
+      sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 180 }}
     >
       <TableContainer sx={{ flex: 1, minHeight: 0 }}>
         <Table size="small" stickyHeader sx={{ minWidth: 860 }}>
@@ -181,31 +240,16 @@ export function TransactionTable({
               visibleRows.map((transaction) => {
                 const account = accounts.get(transaction.accountId)
                 const isSuggested = transaction.nature !== 'TRANSFER' && suggestionIds.has(transaction.id)
+                const isRefundSuggested =
+                  transaction.nature !== 'REFUND' && refundSuggestionIds.has(transaction.id)
                 return (
                   <TableRow key={transaction.id} hover>
                     <TableCell sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {formatDate(transaction.transactionDate)}
                     </TableCell>
                     <TableCell>
-                      {isSuggested ? (
-                        <Box
-                          component="span"
-                          sx={{
-                            typography: 'caption',
-                            fontWeight: 600,
-                            color: 'text.secondary',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            px: 0.75,
-                            py: 0,
-                            mr: 1,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Internal
-                        </Box>
-                      ) : null}
+                      {isSuggested ? <PairTag label="Internal" /> : null}
+                      {isRefundSuggested ? <PairTag label="Refund" /> : null}
                       <Typography variant="body2">{transaction.description || transaction.merchant || '—'}</Typography>
                       {transaction.merchant && transaction.merchant !== transaction.description ? (
                         <Typography variant="caption" color="text.secondary">
@@ -224,6 +268,7 @@ export function TransactionTable({
                         categories={categories}
                         onCategoryChange={onCategoryChange}
                         onUnlink={onUnlink}
+                        onUnlinkRefund={onUnlinkRefund}
                       />
                     </TableCell>
                     <TableCell>

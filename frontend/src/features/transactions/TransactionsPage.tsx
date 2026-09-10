@@ -11,15 +11,17 @@ import {
   useAccounts,
   useAccountsById,
   useCategories,
+  useRefundSuggestions,
   useTransferSuggestions,
 } from '../../api/queries'
-import { transactionsApi, transfersApi } from '../../api/endpoints'
+import { refundsApi, transactionsApi, transfersApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
 import type { AccountPresentation } from '../../api/queries'
-import type { TransferSuggestion } from '../../types'
+import type { RefundSuggestion, TransferSuggestion } from '../../types'
 import { PageHeader, PageShell } from '../../components/PageLayout'
 import { useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
+import { RefundSuggestionRow, TransferSuggestionRow } from './SuggestionRows'
 import { TransactionFilters } from './TransactionFilters'
 import { TransactionTable } from './TransactionTable'
 import { SuggestionsPanel } from './SuggestionsPanel'
@@ -108,6 +110,35 @@ export function TransactionsPage() {
     onSuccess: invalidateAfterTransferAction,
   })
 
+  const refundSuggestionsQuery = useRefundSuggestions()
+  const refundSuggestionIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const suggestion of refundSuggestionsQuery.data ?? []) {
+      ids.add(suggestion.purchaseTransactionId)
+      ids.add(suggestion.refundTransactionId)
+    }
+    return ids
+  }, [refundSuggestionsQuery.data])
+
+  const invalidateAfterRefundAction = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.refunds })
+    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.root })
+    queryClient.invalidateQueries({ queryKey: queryKeys.statistics.root })
+  }
+  const applyAllRefundsMutation = useMutation({
+    mutationFn: () => refundsApi.applyAll(),
+    onSuccess: invalidateAfterRefundAction,
+  })
+  const applyRefundMutation = useMutation({
+    mutationFn: (suggestion: RefundSuggestion) =>
+      refundsApi.pair(suggestion.purchaseTransactionId, suggestion.refundTransactionId),
+    onSuccess: invalidateAfterRefundAction,
+  })
+  const unlinkRefundMutation = useMutation({
+    mutationFn: (id: number) => refundsApi.unlink(id),
+    onSuccess: invalidateAfterRefundAction,
+  })
+
   const changeCategory = (id: number, categoryId: number | null) => categorizeOne.mutate({ id, categoryId })
 
   const applyFilters = (next: TxFilters) => {
@@ -151,11 +182,35 @@ export function TransactionsPage() {
 
       {(suggestionsQuery.data?.length ?? 0) > 0 ? (
         <SuggestionsPanel
+          title="Internal transfers"
+          subtitle={`${suggestionsQuery.data?.length ?? 0} ${
+            suggestionsQuery.data?.length === 1 ? 'pair' : 'pairs'
+          } that look like moves between your own accounts but are not internal transfers yet.`}
           suggestions={suggestionsQuery.data ?? []}
-          accounts={accountsById}
           busy={applyAllMutation.isPending || applyOneMutation.isPending}
+          rowKey={(suggestion) => `${suggestion.fromTransactionId}-${suggestion.toTransactionId}`}
+          renderRow={(suggestion) => (
+            <TransferSuggestionRow suggestion={suggestion} accounts={accountsById} />
+          )}
           onApplyAll={() => applyAllMutation.mutate()}
           onApply={(suggestion) => applyOneMutation.mutate(suggestion)}
+        />
+      ) : null}
+
+      {(refundSuggestionsQuery.data?.length ?? 0) > 0 ? (
+        <SuggestionsPanel
+          title="Refunds"
+          subtitle={`${refundSuggestionsQuery.data?.length ?? 0} ${
+            refundSuggestionsQuery.data?.length === 1 ? 'purchase' : 'purchases'
+          } that came back. Linking both legs takes them out of your spending and income.`}
+          suggestions={refundSuggestionsQuery.data ?? []}
+          busy={applyAllRefundsMutation.isPending || applyRefundMutation.isPending}
+          rowKey={(suggestion) => `${suggestion.purchaseTransactionId}-${suggestion.refundTransactionId}`}
+          renderRow={(suggestion) => (
+            <RefundSuggestionRow suggestion={suggestion} accounts={accountsById} />
+          )}
+          onApplyAll={() => applyAllRefundsMutation.mutate()}
+          onApply={(suggestion) => applyRefundMutation.mutate(suggestion)}
         />
       ) : null}
 
@@ -185,8 +240,10 @@ export function TransactionsPage() {
               setPage(0)
             }}
             suggestionIds={suggestionIds}
+            refundSuggestionIds={refundSuggestionIds}
             onCategoryChange={changeCategory}
             onUnlink={(id) => unlinkMutation.mutate(id)}
+            onUnlinkRefund={(id) => unlinkRefundMutation.mutate(id)}
           />
         </>
       )}

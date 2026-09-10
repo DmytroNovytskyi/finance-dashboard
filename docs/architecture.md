@@ -30,10 +30,10 @@ Defined in `domain/port`:
 
 ## Use cases
 
-`application` exposes orchestration classes such as `ImportStatementUseCase`,
-`CategorizeTransactionsUseCase`, `CategoryManagementUseCase`, `AccountManagementUseCase`,
-`TransferUseCase`, `DeleteTransactionsUseCase`, `StatisticsUseCase`, and `MerchantRuleService`.
-Controllers stay thin and delegate to these.
+`application` exposes orchestration classes such as `StatementImportService`, `TransactionService`,
+`TransactionEditService` (categorize, pair/unpair, delete), `CategoryService`, `AccountService`,
+`MerchantRuleService`, `TransferSuggestionService`, `RefundSuggestionService`, and
+`StatisticsService`. Controllers stay thin and delegate to these.
 
 ## Pattern summary
 
@@ -55,9 +55,11 @@ account number are set by the statements, used to recognize later imports of the
 and cannot be changed through the API — `AccountUpdateRequest` omits them, so a client that sends
 them has them ignored rather than applied. Accounts have no manual create or edit path in the UI;
 the only user actions are rename, tag, and delete.
-`nature=TRANSFER` rows (incl. internal transfers between the user's own accounts)
-are excluded from every statistic; they carry the reserved **Internal Transfer** category (system
-rows, non-deletable) so they appear and filter as a normal group in the UI.
+`nature=TRANSFER` and `nature=REFUND` rows (internal transfers between the user's own accounts, and
+a purchase with the money the bank gave back for it) are excluded from every statistic; they carry
+a reserved, non-deletable category (**Internal Transfer**, **Refund**) so they appear and filter as
+normal groups in the UI. Reserved categories are resolved by `category.system_key`, not by name:
+more than one exists and the user may rename any of them.
 
 Internal-transfer detection and review: the matcher pairs non-transfer legs between own accounts
 that reference each other's account number (mirror, works across currencies/FX) or that match in
@@ -69,6 +71,22 @@ Suggestions: `GET /api/v1/transfers/suggestions`, apply one pair `POST /api/v1/t
 (`{fromTransactionId,toTransactionId}`), apply all `POST /api/v1/transfers/suggestions/apply`,
 and revert an applied transfer `POST /api/v1/transfers/{transactionId}/unlink` (both legs return
 to their natural income/expense and category).
+
+Refund detection and review: a refund candidate is an incoming row whose wording reverses a
+payment (`ANULOWANIE TRANSAKCJI`, `ZWROT ... TRANSAKCJI`), which is what keeps the tax office's
+`Zwrot z podatku VAT` out — it names no payment, so it is never a candidate. Pekao embeds the
+reversed transaction in that wording, and the matcher reads it: the date as `DN. dd/MM/yyyy` and
+the merchant after `WYKONANEJ:`. It then looks for an expense of **equal magnitude in the same
+account**, dated on or before the refund and within 120 days, preferring a purchase both anchors
+agree on and otherwise the nearest one; equal amount alone would mostly surface the user's own
+settlements. Each purchase is spent on one refund. Nothing is linked automatically — a suggestion
+is reported as `ANCHORED` or `AMOUNT` so the reason is visible. Linking sets both legs to `REFUND`
+with the reserved Refund category; unlike a transfer the two legs sit in the **same** account and
+must have opposite signs and an equal magnitude, since netting out a partial refund would erase
+spending that really happened. Suggestions: `GET /api/v1/refunds/suggestions`, link one pair
+`POST /api/v1/refunds` (`{purchaseTransactionId,refundTransactionId}`), link all
+`POST /api/v1/refunds/suggestions/apply`, and revert `POST /api/v1/refunds/{transactionId}/unlink`
+(both legs return to their natural income/expense and category).
 
 Transactions: `GET /api/v1/transactions` lists filtered rows (`accountId`, `categoryId`/`uncategorized`,
 `nature`, `from`/`to`, `q`, `page`/`size`) ordered by `sort` (`date|amount|account|category`) with
@@ -107,9 +125,9 @@ transactions (keeping the category); `POST /api/v1/merchant-rules/{id}/unlink` c
 default tagged (reverting them to uncategorized) while keeping the default itself, so it still
 auto-tags future imports; and `POST /api/v1/transactions/categorize` bulk-assigns a
 category to listed rows. `POST /api/v1/transactions/uncategorize-all` clears the category of every
-categorized non-transfer row (internal transfers keep their reserved tag). Accounts can be removed
-wholesale with `DELETE /api/v1/accounts/{id}`, which deletes the account, its statements, and all
-its transactions (un-pairing any surviving transfer leg).
+categorized row that is not excluded by nature (internal transfers and refunds keep their reserved
+tag). Accounts can be removed wholesale with `DELETE /api/v1/accounts/{id}`, which deletes the
+account, its statements, and all its transactions (un-pairing any surviving transfer or refund leg).
 
 Statements: `POST /api/v1/statements` (multipart import; the owning account is read from the
 statement — by its account number, else its currency — and created if unknown, so no account is
@@ -118,7 +136,7 @@ chosen at upload),
 transactions it introduced; ordered by `sort` = `imported|file|account|period` with `order` =
 `asc|desc`, defaulting to newest import, and optionally restricted to one account — an
 unrecognised `sort` falls back to that default), `DELETE /api/v1/statements/{id}` (removes the statement and the transaction rows
-it introduced, un-pairing any surviving transfer leg, so its file can be re-imported; an account
+it introduced, un-pairing any surviving transfer or refund leg, so its file can be re-imported; an account
 left with no transactions or statements is removed as well), and
 `GET /api/v1/statements/coverage` (per account, the earliest and latest period covered, any hole
 between consecutive statements, and any period that has closed without a statement). Original

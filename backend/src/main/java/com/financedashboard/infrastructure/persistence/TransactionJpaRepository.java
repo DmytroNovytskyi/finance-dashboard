@@ -18,11 +18,13 @@ public interface TransactionJpaRepository
 
     List<TransactionEntity> findByTransferGroupIdIn(Collection<UUID> transferGroupIds);
 
-    List<TransactionEntity> findByNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
+    List<TransactionEntity> findByRefundGroupIdIn(Collection<UUID> refundGroupIds);
 
-    List<TransactionEntity> findByCategoryIdIsNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
+    List<TransactionEntity> findByNatureNotInOrderByTransactionDateAscIdAsc(Collection<TransactionNature> natures);
 
-    List<TransactionEntity> findByCategoryIdIsNotNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature nature);
+    List<TransactionEntity> findByCategoryIdIsNullAndNatureNotInOrderByTransactionDateAscIdAsc(Collection<TransactionNature> natures);
+
+    List<TransactionEntity> findByCategoryIdIsNotNullAndNatureNotInOrderByTransactionDateAscIdAsc(Collection<TransactionNature> natures);
 
     List<TransactionEntity> findByStatementId(Long statementId);
 

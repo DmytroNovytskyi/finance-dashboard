@@ -59,7 +59,7 @@ public class TransferSuggestionService {
         }
 
         Map<Long, List<Transaction>> byAccount = new HashMap<>();
-        for (Transaction tx : transactions.findAllNonTransfers()) {
+        for (Transaction tx : transactions.findAllStatistical()) {
             byAccount.computeIfAbsent(tx.getAccountId(), k -> new ArrayList<>()).add(tx);
         }
 

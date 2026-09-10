@@ -150,7 +150,7 @@ public class StatisticsService {
         String code = supportedCurrencies.resolve(displayCurrency);
         Collection<Long> accountIds = resolveAccountIds(accountId, kind);
         List<Transaction> rows = (accountIds == null || !accountIds.isEmpty())
-                ? transactions.findNonTransfers(from, to, accountIds)
+                ? transactions.findStatistical(from, to, accountIds)
                 : List.of();
         Map<Long, BigDecimal> amounts = amountsFor(rows, code);
 
@@ -250,7 +250,7 @@ public class StatisticsService {
         }
         String code = supportedCurrencies.resolve(displayCurrency);
         List<Transaction> matching = new ArrayList<>();
-        for (Transaction tx : transactions.findNonTransfers(from, to, null)) {
+        for (Transaction tx : transactions.findStatistical(from, to, null)) {
             if (categoryId.equals(tx.getCategoryId())) {
                 matching.add(tx);
             }
@@ -283,7 +283,7 @@ public class StatisticsService {
         }
         String code = supportedCurrencies.resolve(displayCurrency);
         List<Transaction> matching = new ArrayList<>();
-        for (Transaction tx : transactions.findNonTransfers(from, to, null)) {
+        for (Transaction tx : transactions.findStatistical(from, to, null)) {
             if (categoryId.equals(tx.getCategoryId())) {
                 matching.add(tx);
             }

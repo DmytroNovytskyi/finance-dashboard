@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import type { Account, Category } from '../types'
 import { categoricalPalette, useScheme } from '../theme'
-import { accountsApi, categoriesApi, statementsApi, transfersApi } from './endpoints'
+import { accountsApi, categoriesApi, refundsApi, statementsApi, transfersApi } from './endpoints'
 import { queryKeys } from './keys'
 
 /** All accounts, ordered as the backend returns them. */
@@ -42,6 +42,11 @@ function orderCategories(categories: Category[], scheme: 'light' | 'dark'): Cate
 /** Own-account transfer pairs the matcher detected but are not yet internal transfers. */
 export function useTransferSuggestions() {
   return useQuery({ queryKey: queryKeys.transfers, queryFn: transfersApi.suggestions })
+}
+
+/** Purchase-and-refund pairs the matcher detected but that are not linked yet. */
+export function useRefundSuggestions() {
+  return useQuery({ queryKey: queryKeys.refunds, queryFn: refundsApi.suggestions })
 }
 
 /** How far each account's imported statements reach, and where they are incomplete. */

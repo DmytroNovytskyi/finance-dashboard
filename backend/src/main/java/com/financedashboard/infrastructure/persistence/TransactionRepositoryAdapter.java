@@ -7,7 +7,6 @@ import com.financedashboard.domain.transaction.TransactionFilter;
 import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.domain.transaction.TransactionOrder;
 import com.financedashboard.domain.transaction.TransactionSortField;
-import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.infrastructure.persistence.entity.TransactionEntity;
 import com.financedashboard.infrastructure.persistence.mapper.TransactionMapper;
 import jakarta.persistence.EntityManager;
@@ -87,10 +86,10 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
-    public List<Transaction> findNonTransfers(LocalDate from, LocalDate to, Collection<Long> accountIds) {
+    public List<Transaction> findStatistical(LocalDate from, LocalDate to, Collection<Long> accountIds) {
         Specification<TransactionEntity> spec = (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.notEqual(root.get("nature"), TransactionNature.TRANSFER));
+            predicates.add(cb.not(root.get("nature").in(TransactionNature.excludedFromStatistics())));
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("transactionDate"), from));
             }
@@ -110,6 +109,11 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     @Override
     public List<Transaction> findByTransferGroupIds(Collection<UUID> transferGroupIds) {
         return mapper.toDomain(jpa.findByTransferGroupIdIn(transferGroupIds));
+    }
+
+    @Override
+    public List<Transaction> findByRefundGroupIds(Collection<UUID> refundGroupIds) {
+        return mapper.toDomain(jpa.findByRefundGroupIdIn(refundGroupIds));
     }
 
     @Override
@@ -160,18 +164,21 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
-    public List<Transaction> findAllNonTransfers() {
-        return mapper.toDomain(jpa.findByNatureNotOrderByTransactionDateAscIdAsc(TransactionNature.TRANSFER));
+    public List<Transaction> findAllStatistical() {
+        return mapper.toDomain(jpa.findByNatureNotInOrderByTransactionDateAscIdAsc(
+                TransactionNature.excludedFromStatistics()));
     }
 
     @Override
     public List<Transaction> findUncategorized() {
-        return mapper.toDomain(jpa.findByCategoryIdIsNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature.TRANSFER));
+        return mapper.toDomain(jpa.findByCategoryIdIsNullAndNatureNotInOrderByTransactionDateAscIdAsc(
+                TransactionNature.excludedFromStatistics()));
     }
 
     @Override
     public List<Transaction> findCategorized() {
-        return mapper.toDomain(jpa.findByCategoryIdIsNotNullAndNatureNotOrderByTransactionDateAscIdAsc(TransactionNature.TRANSFER));
+        return mapper.toDomain(jpa.findByCategoryIdIsNotNullAndNatureNotInOrderByTransactionDateAscIdAsc(
+                TransactionNature.excludedFromStatistics()));
     }
 
     @Override

@@ -3,6 +3,8 @@ import type {
   Category,
   MerchantRule,
   PageResponse,
+  RefundPair,
+  RefundSuggestion,
   Statement,
   StatementCoverage,
   StatementImportResult,
@@ -150,6 +152,22 @@ export const transfersApi = {
   /** Reverts an internal transfer back to its natural income/expense legs. */
   unlink: (transactionId: number) =>
     request<{ count: number }>(`/transfers/${transactionId}/unlink`, { method: 'POST' }),
+}
+
+export const refundsApi = {
+  /** Detected purchase-and-refund pairs that are not linked yet. */
+  suggestions: () => request<RefundSuggestion[]>('/refunds/suggestions'),
+  /** Links one purchase with its refund. */
+  pair: (purchaseTransactionId: number, refundTransactionId: number) =>
+    request<RefundPair>('/refunds', {
+      method: 'POST',
+      body: JSON.stringify({ purchaseTransactionId, refundTransactionId }),
+    }),
+  /** Links every current suggestion. */
+  applyAll: () => request<{ applied: number }>('/refunds/suggestions/apply', { method: 'POST' }),
+  /** Reverts a linked pair back to its natural income/expense legs. */
+  unlink: (transactionId: number) =>
+    request<{ count: number }>(`/refunds/${transactionId}/unlink`, { method: 'POST' }),
 }
 
 export const merchantRulesApi = {

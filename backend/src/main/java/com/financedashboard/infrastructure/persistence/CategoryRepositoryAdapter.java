@@ -32,8 +32,8 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
-    public Optional<Category> findSystemCategory() {
-        return jpa.findFirstBySystemTrue().map(mapper::toDomain);
+    public Optional<Category> findSystemCategory(String systemKey) {
+        return jpa.findFirstBySystemKey(systemKey).map(mapper::toDomain);
     }
 
     @Override

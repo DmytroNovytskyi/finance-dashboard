@@ -9,6 +9,7 @@ export const queryKeys = {
   statementList: (params: StatementListParams) => ['statements', 'list', params] as const,
   statementCoverage: ['statements', 'coverage'] as const,
   transfers: ['transfers'] as const,
+  refunds: ['refunds'] as const,
   transactions: {
     root: ['transactions'] as const,
     list: (params: TransactionListParams) => ['transactions', 'list', params] as const,

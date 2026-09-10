@@ -57,6 +57,8 @@ its dates, because each transaction is valued in all of them.
 - Transfers are excluded from statistics (both legs are `nature=TRANSFER`); their own amounts
   are what move between the accounts. A conversion between own accounts is not re-derived from an
   NBP rate.
+- Refunds are excluded the same way (both legs are `nature=REFUND`), so a reversed purchase is
+  neither spending nor income in any currency.
 - Rows are immutable facts. They are never recomputed on read and never updated in place.
 - Changing the base currency or the supported set changes which values future imports and the
   backfill write; stored rows are historical and left as-is.

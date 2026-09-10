@@ -3,9 +3,11 @@ package com.financedashboard.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.financedashboard.domain.category.Category;
 import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.CategoryRepository;
@@ -339,5 +341,125 @@ class TransactionEditServiceTest {
         assertThatThrownBy(() -> service.unpairTransfer(1L))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(transactions, org.mockito.Mockito.never()).saveAll(any());
+    }
+
+    @Test
+    void pairRefundMarksBothLegsWithTheSharedGroupAndTheReservedCategory() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
+        Transaction refund = transaction(2L, 1L, new BigDecimal("17.80"), TransactionNature.INCOME);
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(refund));
+        when(categories.findSystemCategory("REFUND"))
+                .thenReturn(Optional.of(Category.builder().id(9L).name("Refund").build()));
+        when(transactions.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var legs = service.pairRefund(1L, 2L);
+
+        assertThat(legs).allSatisfy(leg -> {
+            assertThat(leg.getNature()).isEqualTo(TransactionNature.REFUND);
+            assertThat(leg.getCategoryId()).isEqualTo(9L);
+        });
+        assertThat(legs.get(0).getRefundGroupId()).isEqualTo(legs.get(1).getRefundGroupId()).isNotNull();
+    }
+
+    @Test
+    void pairRefundRejectsLegsInDifferentAccounts() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
+        Transaction refund = transaction(2L, 2L, new BigDecimal("17.80"), TransactionNature.INCOME);
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(refund));
+
+        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void pairRefundRejectsLegsOfTheSameSign() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
+        Transaction other = transaction(2L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void pairRefundRejectsAPartialRefund() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
+        Transaction partial = transaction(2L, 1L, new BigDecimal("8.90"), TransactionNature.INCOME);
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(partial));
+
+        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void pairRefundRejectsALegThatIsAlreadyPaired() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
+        Transaction refund = transaction(2L, 1L, new BigDecimal("17.80"), TransactionNature.INCOME)
+                .toBuilder().refundGroupId(UUID.randomUUID()).build();
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(refund));
+
+        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(transactions, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void unpairRefundRevertsBothLegsToTheirNaturalNature() {
+        UUID group = UUID.randomUUID();
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.REFUND)
+                .toBuilder().refundGroupId(group).categoryId(9L).build();
+        Transaction refund = transaction(2L, 1L, new BigDecimal("17.80"), TransactionNature.REFUND)
+                .toBuilder().refundGroupId(group).categoryId(9L).build();
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findByRefundGroupIds(List.of(group))).thenReturn(List.of(purchase, refund));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<Transaction> reverted = service.unpairRefund(1L);
+
+        assertThat(reverted).hasSize(2);
+        assertThat(reverted).allSatisfy(leg -> {
+            assertThat(leg.getNature()).isEqualTo(TransactionNature.forSignedAmount(leg.getAmount()));
+            assertThat(leg.getRefundGroupId()).isNull();
+            assertThat(leg.getCategoryId()).isNull();
+        });
+    }
+
+    @Test
+    void unpairRefundRejectsARowThatIsNotPartOfARefund() {
+        Transaction plain = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE);
+        when(transactions.findById(1L)).thenReturn(Optional.of(plain));
+
+        assertThatThrownBy(() -> service.unpairRefund(1L))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(transactions, org.mockito.Mockito.never()).saveAll(any());
+    }
+
+    @Test
+    void categorizeRejectsRefundNature() {
+        assertThatThrownBy(() -> service.categorize(1L, false, null, TransactionNature.REFUND))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void deleteRangeUnpairsTheRefundLegItLeavesBehind() {
+        UUID group = UUID.randomUUID();
+        Transaction doomed = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.REFUND)
+                .toBuilder().refundGroupId(group).categoryId(9L).build();
+        Transaction survivor = transaction(2L, 1L, new BigDecimal("17.80"), TransactionNature.REFUND)
+                .toBuilder().refundGroupId(group).categoryId(9L).build();
+        when(transactions.findByDateRangeAndAccount(any(), any(), any())).thenReturn(List.of(doomed));
+        when(transactions.findByRefundGroupIds(List.of(group))).thenReturn(List.of(doomed, survivor));
+
+        service.deleteRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 1L);
+
+        verify(transactions).save(argThat(leg -> leg.getId().equals(2L)
+                && leg.getRefundGroupId() == null
+                && leg.getNature() == TransactionNature.INCOME
+                && leg.getCategoryId() == null));
     }
 }

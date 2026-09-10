@@ -76,6 +76,9 @@ public class TransactionEntity {
     @Column(name = "transfer_group_id")
     private UUID transferGroupId;
 
+    @Column(name = "refund_group_id")
+    private UUID refundGroupId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

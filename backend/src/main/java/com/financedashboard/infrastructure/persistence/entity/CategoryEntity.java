@@ -37,6 +37,9 @@ public class CategoryEntity {
     @Column(nullable = false)
     private boolean system;
 
+    @Column(name = "system_key", length = 32)
+    private String systemKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

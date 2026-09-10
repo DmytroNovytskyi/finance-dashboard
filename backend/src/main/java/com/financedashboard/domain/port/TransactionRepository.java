@@ -3,6 +3,7 @@ package com.financedashboard.domain.port;
 import com.financedashboard.domain.transaction.PagedTransactions;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionFilter;
+import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.domain.transaction.TransactionOrder;
 import java.time.LocalDate;
 import java.util.Collection;
@@ -31,14 +32,18 @@ public interface TransactionRepository {
     List<Transaction> findByDateRangeAndAccount(LocalDate from, LocalDate to, Long accountId);
 
     /**
-     * Returns non-transfer transactions with a transaction date within the inclusive range (bounds
-     * optional), restricted to the given accounts, oldest first. {@code null} bounds or accountIds
-     * mean no restriction. Used by statistics.
+     * Returns the transactions that count towards statistics — everything whose nature is not
+     * excluded ({@link TransactionNature#excludedFromStatistics()}) — with a transaction date
+     * within the inclusive range (bounds optional), restricted to the given accounts, oldest
+     * first. {@code null} bounds or accountIds mean no restriction.
      */
-    List<Transaction> findNonTransfers(LocalDate from, LocalDate to, Collection<Long> accountIds);
+    List<Transaction> findStatistical(LocalDate from, LocalDate to, Collection<Long> accountIds);
 
     /** Returns transactions belonging to any of the given transfer groups. */
     List<Transaction> findByTransferGroupIds(Collection<UUID> transferGroupIds);
+
+    /** Returns transactions belonging to any of the given refund groups. */
+    List<Transaction> findByRefundGroupIds(Collection<UUID> refundGroupIds);
 
     /** Returns whether any transaction belongs to the statement with the given id. */
     boolean existsByStatementId(Long statementId);
@@ -64,17 +69,20 @@ public interface TransactionRepository {
     /** Returns all transactions, oldest first. Used by the multi-currency backfill. */
     List<Transaction> findAll();
 
-    /** Returns all transactions that are not internal transfers, oldest first. */
-    List<Transaction> findAllNonTransfers();
+    /**
+     * Returns all transactions that count towards statistics, oldest first. Used as the candidate
+     * pool for transfer pairing, which must never pick up a row that is already excluded.
+     */
+    List<Transaction> findAllStatistical();
 
     /**
-     * Returns transactions that have no category and are not internal transfers, oldest first.
+     * Returns transactions that have no category and are not excluded by nature, oldest first.
      * Candidates for applying merchant default rules.
      */
     List<Transaction> findUncategorized();
 
     /**
-     * Returns transactions that carry a category and are not internal transfers, oldest first.
+     * Returns transactions that carry a category and are not excluded by nature, oldest first.
      * Candidates for the bulk "clear category" actions.
      */
     List<Transaction> findCategorized();

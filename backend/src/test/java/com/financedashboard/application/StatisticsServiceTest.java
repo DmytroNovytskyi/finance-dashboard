@@ -66,7 +66,7 @@ class StatisticsServiceTest {
     @Test
     void summarizesIncomeExpenseAndGroupsByMonthCategoryAndMerchant() {
         when(categories.findAll()).thenReturn(List.of(groceries));
-        when(transactions.findNonTransfers(eq(LocalDate.of(2026, 3, 1)),
+        when(transactions.findStatistical(eq(LocalDate.of(2026, 3, 1)),
                 eq(LocalDate.of(2026, 3, 31)), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 12), PLN_50, 1L, "Example Store"),
@@ -109,7 +109,7 @@ class StatisticsServiceTest {
     @Test
     void splitsIncomeAndExpenseAcrossMonths() {
         when(categories.findAll()).thenReturn(List.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 31), PLN_100, 1L, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 4, 1), PLN_300, 1L, "Refund")));
         stubPlnAmounts(Map.of(1L, PLN_100, 2L, PLN_300));
@@ -128,7 +128,7 @@ class StatisticsServiceTest {
     @Test
     void skipsRowsWithoutAStoredValueInTheRequestedCurrency() {
         when(categories.findAll()).thenReturn(List.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 11), PLN_50, 1L, "Example Store")));
         stubPlnAmounts(Map.of(2L, PLN_50));
@@ -143,7 +143,7 @@ class StatisticsServiceTest {
     @Test
     void limitsMerchantsToTopN() {
         when(categories.findAll()).thenReturn(List.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), new BigDecimal("-1"), 1L, "M1"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 10), new BigDecimal("-2"), 1L, "M2")));
         stubPlnAmounts(Map.of(1L, new BigDecimal("-1"), 2L, new BigDecimal("-2")));
@@ -159,7 +159,7 @@ class StatisticsServiceTest {
                 .kind(AccountKind.BUSINESS).build();
         when(categories.findAll()).thenReturn(List.of(groceries));
         when(accounts.findByKind(AccountKind.BUSINESS)).thenReturn(List.of(business));
-        when(transactions.findNonTransfers(any(), any(), eq(List.of(7L)))).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), eq(List.of(7L)))).thenReturn(List.of(
                 tx(1L, 7L, LocalDate.of(2026, 3, 10), PLN_300, null, "Client"),
                 tx(2L, 7L, LocalDate.of(2026, 3, 12), PLN_100, null, "Supplies")));
         stubPlnAmounts(Map.of(1L, PLN_300, 2L, PLN_100));
@@ -175,7 +175,7 @@ class StatisticsServiceTest {
     void restrictsToOneAccount() {
         when(categories.findAll()).thenReturn(List.of(groceries));
         when(accounts.existsById(9L)).thenReturn(true);
-        when(transactions.findNonTransfers(any(), any(), eq(List.of(9L)))).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), eq(List.of(9L)))).thenReturn(List.of(
                 tx(1L, 9L, LocalDate.of(2026, 3, 10), PLN_100, null, "Shop")));
         stubPlnAmounts(Map.of(1L, PLN_100));
 
@@ -203,7 +203,7 @@ class StatisticsServiceTest {
     @Test
     void groupsTrendByGranularityBucket() {
         when(categories.findAll()).thenReturn(List.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Shop"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 11), PLN_20, 1L, "Shop")));
         stubPlnAmounts(Map.of(1L, PLN_100, 2L, PLN_20));
@@ -244,7 +244,7 @@ class StatisticsServiceTest {
     @Test
     void sumsRequestedCurrencyFromStoredAmounts() {
         when(categories.findAll()).thenReturn(List.of());
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, null, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 12), PLN_50, null, "Example Store")));
         when(transactionAmounts.findAmountsByCurrency(any(), eq("USD"))).thenReturn(
@@ -264,7 +264,7 @@ class StatisticsServiceTest {
     @Test
     void fallsBackToBaseCurrencyForAnUnsupportedDisplayCode() {
         when(categories.findAll()).thenReturn(List.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store")));
         stubPlnAmounts(Map.of(1L, PLN_100));
 
@@ -278,7 +278,7 @@ class StatisticsServiceTest {
     @Test
     void categorySeriesReturnsOnlyThatCategorysTransactions() {
         when(categories.findById(1L)).thenReturn(Optional.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 11), PLN_20, 1L, "Example Store"),
                 tx(3L, 1L, LocalDate.of(2026, 3, 12), PLN_300, 2L, "Client")));
@@ -295,7 +295,7 @@ class StatisticsServiceTest {
     @Test
     void categorySeriesSkipsRowsWithoutAStoredAmount() {
         when(categories.findById(1L)).thenReturn(Optional.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 11), PLN_20, 1L, "Example Store")));
         stubPlnAmounts(Map.of(1L, PLN_100));
@@ -317,7 +317,7 @@ class StatisticsServiceTest {
     @Test
     void categorySeriesInRequestedCurrency() {
         when(categories.findById(1L)).thenReturn(Optional.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store")));
         when(transactionAmounts.findAmountsByCurrency(any(), eq("USD"))).thenReturn(
                 Map.of(1L, new BigDecimal("-25")));
@@ -331,7 +331,7 @@ class StatisticsServiceTest {
     @Test
     void categoryTrendBucketsOnlyThatCategorysTransactions() {
         when(categories.findById(1L)).thenReturn(Optional.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store"),
                 tx(2L, 1L, LocalDate.of(2026, 3, 11), PLN_20, 1L, "Example Store"),
                 tx(3L, 1L, LocalDate.of(2026, 3, 12), PLN_300, 2L, "Client")));
@@ -356,7 +356,7 @@ class StatisticsServiceTest {
     @Test
     void categoryTrendInRequestedCurrency() {
         when(categories.findById(1L)).thenReturn(Optional.of(groceries));
-        when(transactions.findNonTransfers(any(), any(), any())).thenReturn(List.of(
+        when(transactions.findStatistical(any(), any(), any())).thenReturn(List.of(
                 tx(1L, 1L, LocalDate.of(2026, 3, 10), PLN_100, 1L, "Example Store")));
         when(transactionAmounts.findAmountsByCurrency(any(), eq("USD"))).thenReturn(
                 Map.of(1L, new BigDecimal("-25")));

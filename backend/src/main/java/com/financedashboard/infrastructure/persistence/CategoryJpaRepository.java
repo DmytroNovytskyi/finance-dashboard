@@ -10,5 +10,5 @@ public interface CategoryJpaRepository extends JpaRepository<CategoryEntity, Lon
 
     List<CategoryEntity> findAllByOrderBySortOrderAscNameAsc();
 
-    Optional<CategoryEntity> findFirstBySystemTrue();
+    Optional<CategoryEntity> findFirstBySystemKey(String systemKey);
 }

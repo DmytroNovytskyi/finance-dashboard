@@ -22,10 +22,12 @@ export interface TxFilters {
 
 export const emptyFilters: TxFilters = { uncategorized: false, q: '' }
 
+const NATURES: TransactionNature[] = ['INCOME', 'EXPENSE', 'TRANSFER', 'REFUND']
+
 /** Initial filters read from the URL (used for overview drill-down links). */
 export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
-  const nature = searchParams.get('nature')
-  const natureValue = nature === 'INCOME' || nature === 'EXPENSE' || nature === 'TRANSFER' ? nature : undefined
+  const nature = searchParams.get('nature') as TransactionNature | null
+  const natureValue = nature && NATURES.includes(nature) ? nature : undefined
   const accountId = searchParams.get('accountId')
   const categoryId = searchParams.get('categoryId')
   const from = searchParams.get('from')

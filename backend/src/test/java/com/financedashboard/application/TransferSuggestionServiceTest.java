@@ -52,7 +52,7 @@ class TransferSuggestionServiceTest {
     void pairsMirroredLegsAcrossCurrencies() {
         Transaction out = tx(10L, 1L, "-100.00", "USD", "PRZELEW MOBILE BENF " + ACCOUNT_B);
         Transaction in = tx(11L, 2L, "50.00", "PLN", "PRZELEW MOBILE SACC " + ACCOUNT_A);
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
 
         List<SuggestedTransfer> suggestions = service.suggest();
 
@@ -66,7 +66,7 @@ class TransferSuggestionServiceTest {
     void pairsEqualAmountInboundAsFallback() {
         Transaction out = tx(20L, 1L, "-100.00", "USD", "PRZELEW MOBILE to " + ACCOUNT_B);
         Transaction in = tx(21L, 2L, "100.00", "USD", "some income");
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
 
         List<SuggestedTransfer> suggestions = service.suggest();
 
@@ -78,7 +78,7 @@ class TransferSuggestionServiceTest {
     void ignoresOutboundNotReferencingAnotherOwnAccount() {
         Transaction out = tx(30L, 1L, "-100.00", "USD", "EXAMPLE STORE.COM 99999999");
         Transaction in = tx(31L, 2L, "100.00", "USD", "some income");
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
 
         assertThat(service.suggest()).isEmpty();
     }
@@ -87,7 +87,7 @@ class TransferSuggestionServiceTest {
     void ignoresMirrorPairWhoseBothLegsAreCategorized() {
         Transaction out = tx(32L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B).toBuilder().categoryId(3L).build();
         Transaction in = tx(33L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A).toBuilder().categoryId(4L).build();
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
 
         assertThat(service.suggest()).isEmpty();
     }
@@ -96,7 +96,7 @@ class TransferSuggestionServiceTest {
     void suggestsMirrorPairWhenOnlyOneLegIsCategorized() {
         Transaction out = tx(34L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B).toBuilder().categoryId(3L).build();
         Transaction in = tx(35L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A);
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
 
         assertThat(service.suggest()).hasSize(1);
     }
@@ -105,7 +105,7 @@ class TransferSuggestionServiceTest {
     void autoPairsFreshMirrorLegsWhenBothUncategorized() {
         Transaction out = tx(40L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B);
         Transaction in = tx(41L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A);
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
         when(edit.pairIfBothUncategorized(40L, 41L)).thenReturn(true);
 
         int applied = service.autoPairForImported(List.of(41L), edit);
@@ -118,7 +118,7 @@ class TransferSuggestionServiceTest {
     void doesNotAutoPairSuggestionUntouchedByTheImport() {
         Transaction out = tx(42L, 1L, "-100.00", "USD", "BENF " + ACCOUNT_B);
         Transaction in = tx(43L, 2L, "100.00", "USD", "SACC " + ACCOUNT_A);
-        when(transactions.findAllNonTransfers()).thenReturn(List.of(out, in));
+        when(transactions.findAllStatistical()).thenReturn(List.of(out, in));
 
         int applied = service.autoPairForImported(List.of(999L), edit);
 

@@ -78,6 +78,24 @@ class StatisticsApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void excludesRefundsFromTotals() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "h3r");
+        insertTx(statement, account, "2026-03-10", "-100", "EXPENSE", null, "Example Store");
+        insertTx(statement, account, "2026-03-12", "-250", "REFUND", null, "Example Shop");
+        insertTx(statement, account, "2026-03-12", "250", "REFUND", null, null);
+
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.income").value(0.0))
+                .andExpect(jsonPath("$.totals.expense").value(100.0))
+                .andExpect(jsonPath("$.totals.net").value(-100.0))
+                .andExpect(jsonPath("$.totals.count").value(1));
+    }
+
+    @Test
     void filtersByAccountKindAndAccountId() throws Exception {
         long personal = insertAccount("PLN", "PERSONAL");
         long business = insertAccount("PLN", "BUSINESS");

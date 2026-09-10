@@ -39,13 +39,16 @@ deleting a category sets its transactions back to uncategorized.
 | color | varchar null | hex, for UI |
 | sort_order | int not null default 0 | |
 | system | boolean not null default false | reserved categories cannot be deleted |
+| system_key | varchar(32) null | `TRANSFER` / `REFUND`; null for user categories |
 | created_at / updated_at | timestamptz | |
 
 A small default set (Groceries, Transport, Housing, Dining, Entertainment) is seeded on the
 first migration. Migration V3 adds the reserved **Internal Transfer** category (`system = true`,
 added as "Transfer", renamed in V4); every `nature = TRANSFER` row is tagged with it (paired legs
 and a backfill of existing rows), so internal transfers read and filter as a normal, non-deletable
-group.
+group. Migration V6 adds the reserved **Refund** category the same way, and `system_key` with it:
+reserved categories are looked up by key, never by name, because more than one of them exists and
+the user may rename any of them.
 
 ## `merchant_rule`
 
@@ -84,18 +87,20 @@ One imported file, attributed to exactly one account.
 | transaction_date | date not null | |
 | amount | numeric(19,4) not null | signed: expense negative, income positive |
 | currency | char(3) not null | ISO 4217 |
-| nature | varchar not null default `EXPENSE` | `INCOME` / `EXPENSE` / `TRANSFER` |
+| nature | varchar not null default `EXPENSE` | `INCOME` / `EXPENSE` / `TRANSFER` / `REFUND` |
 | description | text | raw from the statement |
 | merchant | varchar null | extracted counterparty |
 | category_id | bigint FK → category, null | null = uncategorized |
 | dedup_hash | varchar | (date, amount, currency, description) — idempotent import |
 | transfer_group_id | uuid null | shared by the two legs of an internal transfer |
+| refund_group_id | uuid null | shared by the purchase and the refund that reverses it |
 | created_at | timestamptz | |
 
 `EXPENSE` and `INCOME` participate in statistics; `TRANSFER` rows (money moved between the
-user's own accounts, including currency conversions) are excluded from all spend/income
-stats. The `amount`/`currency` pair is the **native** value from the statement (what the account
-is denominated in) — see `transaction_amount` for the per-currency views.
+user's own accounts, including currency conversions) and `REFUND` rows (a purchase and the money
+the bank gave back for it) are excluded from all spend/income stats. The `amount`/`currency` pair
+is the **native** value from the statement (what the account is denominated in) — see
+`transaction_amount` for the per-currency views.
 
 ## `transaction_amount`
 
