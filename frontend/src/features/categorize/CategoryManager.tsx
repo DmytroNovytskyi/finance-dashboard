@@ -17,7 +17,7 @@ import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
-import { stretchesToFill, useFittingRows } from '../../hooks/useFittingRows'
+import { useFittingRows } from '../../hooks/useFittingRows'
 import { useCreateCategory, useDeleteCategory, useUncategorizeCategory, useUpdateCategory } from './hooks'
 
 interface CategoryManagerProps {
@@ -49,14 +49,13 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const mutationError = (create.error ?? update.error ?? remove.error ?? unlink.error) as Error | null
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(categories.length, {
+  const { containerRef, rows: perPage, rowHeight } = useFittingRows(categories.length, {
     rowSelector: '[data-row]',
     naturalRowHeight: CATEGORY_ROW_HEIGHT,
   })
   const maxPage = Math.max(0, Math.ceil(categories.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageCategories = categories.slice(shownPage * perPage, shownPage * perPage + perPage)
-  const stretchRows = stretchesToFill(pageCategories.length, perPage)
 
   const openCreate = () => setEditor({ open: true, name: '', color: EMPTY_COLOR })
   const openEdit = (category: CategoryPresentation) => setEditor({ open: true, id: category.id, name: category.name, color: category.color })
@@ -109,7 +108,8 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
               display: 'flex',
               alignItems: 'center',
               gap: 1.5,
-              flex: stretchRows ? '1 1 0' : '0 0 auto',
+              flex: '0 0 auto',
+              height: rowHeight ?? CATEGORY_ROW_HEIGHT,
               minHeight: CATEGORY_ROW_HEIGHT,
               py: 0.5,
               px: 1,

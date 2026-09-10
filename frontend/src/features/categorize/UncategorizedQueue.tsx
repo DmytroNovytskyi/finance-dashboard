@@ -13,7 +13,7 @@ import TextField from '@mui/material/TextField'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
-import { stretchesToFill, useFittingRows } from '../../hooks/useFittingRows'
+import { useFittingRows } from '../../hooks/useFittingRows'
 import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
 import type { Transaction } from '../../types'
@@ -70,14 +70,13 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const rows = queue.data?.content ?? []
   const total = queue.data?.totalElements ?? 0
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(rows.length, {
+  const { containerRef, rows: perPage, rowHeight } = useFittingRows(rows.length, {
     rowSelector: '[data-row]',
     naturalRowHeight: QUEUE_ROW_HEIGHT,
   })
   const maxPage = Math.max(0, Math.ceil(rows.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageRows = rows.slice(shownPage * perPage, shownPage * perPage + perPage)
-  const stretchRows = stretchesToFill(pageRows.length, perPage)
   const allPageSelected = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
   const somePageSelected = pageRows.some((row) => selected.has(row.id))
 
@@ -281,7 +280,8 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
-                flex: stretchRows ? '1 1 0' : '0 0 auto',
+                flex: '0 0 auto',
+                height: rowHeight ?? QUEUE_ROW_HEIGHT,
                 minHeight: QUEUE_ROW_HEIGHT,
                 py: 0.5,
                 px: 1,

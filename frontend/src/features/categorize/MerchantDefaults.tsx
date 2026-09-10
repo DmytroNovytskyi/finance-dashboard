@@ -16,7 +16,7 @@ import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { uncategorizedColor, useScheme } from '../../theme'
 import type { MerchantRule } from '../../types'
-import { stretchesToFill, useFittingRows } from '../../hooks/useFittingRows'
+import { useFittingRows } from '../../hooks/useFittingRows'
 import {
   useApplyMerchantRule,
   useCreateMerchantRule,
@@ -57,14 +57,13 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   }, [rules.data, categories])
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(orderedRules.length, {
+  const { containerRef, rows: perPage, rowHeight } = useFittingRows(orderedRules.length, {
     rowSelector: '[data-row]',
     naturalRowHeight: DEFAULT_ROW_HEIGHT,
   })
   const maxPage = Math.max(0, Math.ceil(orderedRules.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageRules = orderedRules.slice(shownPage * perPage, shownPage * perPage + perPage)
-  const stretchRows = stretchesToFill(pageRules.length, perPage)
 
   const save = () => {
     if (!merchant.trim() || categoryId === '') return
@@ -136,7 +135,8 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1.5,
-                  flex: stretchRows ? '1 1 0' : '0 0 auto',
+                  flex: '0 0 auto',
+                  height: rowHeight ?? DEFAULT_ROW_HEIGHT,
                   minHeight: DEFAULT_ROW_HEIGHT,
                   py: 0.5,
                   px: 1,

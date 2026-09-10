@@ -6,9 +6,10 @@ interface FittingRowsOptions {
   /** Optional element inside the container whose height is not available for rows, e.g. a head. */
   reservedSelector?: string
   /**
-   * The height a row occupies before any stretching. Supply it for lists whose rows grow to fill
-   * the container — measuring those would read back the stretched height and shrink the page on
-   * every pass.
+   * The height a row occupies when it is not sharing the container. Supply it for lists whose rows
+   * grow to fill: measuring those would read back the grown height and shrink the page on every
+   * pass, and the height the rows take is derived from it rather than measured. Without it the
+   * rows keep their rendered height and only {@link FittingRows.rows} is useful.
    */
   naturalRowHeight?: number
   /** Floor for the count; keep it low, since a floor above what fits reintroduces a scrollbar. */
@@ -20,6 +21,13 @@ interface FittingRows {
   /** Attach to the scrolling container whose height the rows must fill. */
   containerRef: (node: HTMLElement | null) => void
   rows: number
+  /**
+   * The height to give each row, or null when no natural height was supplied. It is worked out
+   * from how many rows the container could hold, not from how many it is actually given, so a
+   * short list keeps the same row height as a full one and simply leaves the rest of the space
+   * empty. Deriving it from the rows on screen instead would make rows jump as the list changes.
+   */
+  rowHeight: number | null
 }
 
 /**
@@ -31,23 +39,30 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
   const { rowSelector, reservedSelector, naturalRowHeight, min = 1, max = 200 } = options
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const [rows, setRows] = useState(min)
+  const [rowHeight, setRowHeight] = useState<number | null>(null)
 
   useEffect(() => {
     if (!container) return
     const measure = () => {
-      let rowHeight = naturalRowHeight ?? 0
+      let measured = naturalRowHeight ?? 0
       if (naturalRowHeight === undefined) {
         for (const row of container.querySelectorAll(rowSelector)) {
-          rowHeight = Math.max(rowHeight, row.getBoundingClientRect().height)
+          measured = Math.max(measured, row.getBoundingClientRect().height)
         }
       }
-      if (rowHeight <= 0) return
+      if (measured <= 0) return
       const gap = parseFloat(getComputedStyle(container).rowGap) || 0
       const reserved = reservedSelector
         ? (container.querySelector(reservedSelector)?.getBoundingClientRect().height ?? 0)
         : 0
       const available = container.clientHeight - reserved
-      setRows(Math.max(min, Math.min(max, Math.floor((available + gap) / (rowHeight + gap)))))
+      const fitting = Math.max(min, Math.min(max, Math.floor((available + gap) / (measured + gap))))
+      setRows(fitting)
+      setRowHeight(
+        naturalRowHeight === undefined || fitting <= 0
+          ? null
+          : (available - (fitting - 1) * gap) / fitting,
+      )
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -55,15 +70,5 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
     return () => observer.disconnect()
   }, [container, rowCount, rowSelector, reservedSelector, naturalRowHeight, min, max])
 
-  return { containerRef: setContainer, rows }
-}
-
-/**
- * Whether a page of rows should stretch to fill its container. Only a full page should: it has
- * less than one row's height left over, so growing the rows hides a remainder too small to hold
- * another row. A list shorter than a page keeps its natural row height and leaves the space below
- * empty, rather than spreading a few rows over the whole card.
- */
-export function stretchesToFill(shown: number, perPage: number): boolean {
-  return perPage > 0 && shown >= perPage
+  return { containerRef: setContainer, rows, rowHeight }
 }
