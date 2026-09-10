@@ -31,7 +31,7 @@ interface UncategorizedQueueProps {
 }
 
 /** Unstretched height of one queue row; the rows share whatever height the card has left. */
-const QUEUE_ROW_HEIGHT = 54
+const QUEUE_ROW_HEIGHT = 52
 
 function normalizeMerchant(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, ' ')

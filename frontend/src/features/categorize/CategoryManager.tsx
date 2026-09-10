@@ -27,7 +27,7 @@ interface CategoryManagerProps {
 const EMPTY_COLOR = '#607d8b'
 
 /** Unstretched height of one category row; the rows share whatever height the card has left. */
-const CATEGORY_ROW_HEIGHT = 42
+const CATEGORY_ROW_HEIGHT = 40
 
 interface EditorState {
   open: boolean

@@ -30,7 +30,7 @@ interface MerchantDefaultsProps {
 }
 
 /** Unstretched height of one default row; the rows share whatever height the card has left. */
-const DEFAULT_ROW_HEIGHT = 54
+const DEFAULT_ROW_HEIGHT = 52
 
 /** Lists merchant→category defaults and lets each be applied to matching uncategorized rows. */
 export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
