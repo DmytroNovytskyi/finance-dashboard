@@ -2,7 +2,6 @@ import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
 import type { AccountPresentation, CategoryPresentation } from '../../api/queries'
 import type { TransactionNature } from '../../types'
 import { hasFilters, type TxFilters } from './model'
@@ -19,6 +18,15 @@ interface TransactionFiltersProps {
 export function TransactionFilters({ filters, accounts, categories, onChange, onClear }: TransactionFiltersProps) {
   const patch = (changes: Partial<TxFilters>) => onChange({ ...filters, ...changes })
 
+  const setSearch = (value: string) => {
+    const tokens = value.trim().split(/\s+/).filter(Boolean)
+    if (tokens.length > 0 && tokens.every((token) => /^\d+$/.test(token))) {
+      patch({ ids: tokens.map(Number), q: '' })
+    } else {
+      patch({ ids: undefined, q: value })
+    }
+  }
+
   const setCategory = (value: string) => {
     if (value === '') patch({ categoryId: undefined, uncategorized: false })
     else if (value === 'uncategorized') patch({ categoryId: undefined, uncategorized: true })
@@ -31,9 +39,9 @@ export function TransactionFilters({ filters, accounts, categories, onChange, on
     <Paper variant="outlined" sx={{ px: 2, py: 1.5, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
       <TextField
         size="small"
-        placeholder="Search description or merchant"
-        value={filters.q}
-        onChange={(event) => patch({ q: event.target.value })}
+        placeholder="Search description, merchant, or transaction ids"
+        value={filters.ids && filters.ids.length > 0 ? filters.ids.join(' ') : filters.q}
+        onChange={(event) => setSearch(event.target.value)}
         sx={{ flexGrow: 1, minWidth: 220 }}
       />
       <TextField
@@ -97,11 +105,6 @@ export function TransactionFilters({ filters, accounts, categories, onChange, on
         onChange={(event) => patch({ to: event.target.value || undefined })}
         slotProps={{ inputLabel: { shrink: true } }}
       />
-      {filters.ids && filters.ids.length > 0 ? (
-        <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-          Showing the {filters.ids.length} transactions of one suggestion
-        </Typography>
-      ) : null}
       {hasFilters(filters) ? (
         <Button size="small" onClick={onClear}>
           Clear

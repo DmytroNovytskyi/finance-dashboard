@@ -40,6 +40,7 @@ export function useCategorizeOne() {
     queryKeys.transactions.root,
     queryKeys.statistics.root,
     queryKeys.transfers,
+    queryKeys.refunds,
   )
   return useMutation({
     mutationFn: ({ id, categoryId }: { id: number; categoryId: number | null }) =>
@@ -54,6 +55,7 @@ export function useCategorizeBulk() {
     queryKeys.transactions.root,
     queryKeys.statistics.root,
     queryKeys.transfers,
+    queryKeys.refunds,
   )
   return useMutation({
     mutationFn: ({ ids, categoryId }: { ids: number[]; categoryId: number | null }) =>

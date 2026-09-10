@@ -153,9 +153,15 @@ export function TransactionsPage() {
     setPage(0)
   }
 
+  /**
+   * Clears both the filters and the query string. The list reads its filters from the URL, so
+   * leaving the old query string behind would make the next drill-down to the same target look
+   * like no navigation at all and silently do nothing.
+   */
   const clearFilters = () => {
     setFilters(emptyFilters)
     setPage(0)
+    navigate('/transactions')
   }
 
   const deleteMutation = useMutation({
