@@ -26,6 +26,9 @@ interface CategoryManagerProps {
 
 const EMPTY_COLOR = '#607d8b'
 
+/** Height of the pagination bar, which the paged lists take out of their row space. */
+const PAGINATION_HEIGHT = 48
+
 /** Unstretched height of one category row; the rows share whatever height the card has left. */
 const CATEGORY_ROW_HEIGHT = 40
 
@@ -51,6 +54,8 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const [page, setPage] = useState(0)
   const { containerRef, rows: perPage, rowHeight } = useFittingRows(categories.length, {
     rowSelector: '[data-row]',
+    paginationSelector: '.MuiTablePagination-root',
+    paginationHeight: PAGINATION_HEIGHT,
     naturalRowHeight: CATEGORY_ROW_HEIGHT,
   })
   const maxPage = Math.max(0, Math.ceil(categories.length / perPage) - 1)

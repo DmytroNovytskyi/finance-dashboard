@@ -12,6 +12,17 @@ interface FittingRowsOptions {
    * rows keep their rendered height and only {@link FittingRows.rows} is useful.
    */
   naturalRowHeight?: number
+  /**
+   * Selector for the pagination bar the caller renders beside the container, searched among the
+   * container's siblings. While it is on screen its height is part of what the container loses, so
+   * supplying it lets the fit be worked out for both states and keeps the count from latching.
+   */
+  paginationSelector?: string
+  /**
+   * Height that bar occupies when it is not on screen and so cannot be measured. It must match the
+   * rendered height, or the two states disagree about how many rows fit.
+   */
+  paginationHeight?: number
   /** Floor for the count; keep it low, since a floor above what fits reintroduces a scrollbar. */
   min?: number
   max?: number
@@ -36,7 +47,15 @@ interface FittingRows {
  * re-measures whenever the container resizes or the row count changes.
  */
 export function useFittingRows(rowCount: number, options: FittingRowsOptions): FittingRows {
-  const { rowSelector, reservedSelector, naturalRowHeight, min = 1, max = 200 } = options
+  const {
+    rowSelector,
+    reservedSelector,
+    naturalRowHeight,
+    paginationSelector,
+    paginationHeight = 0,
+    min = 1,
+    max = 200,
+  } = options
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const [rows, setRows] = useState(min)
   const [rowHeight, setRowHeight] = useState<number | null>(null)
@@ -55,8 +74,19 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
       const reserved = reservedSelector
         ? (container.querySelector(reservedSelector)?.getBoundingClientRect().height ?? 0)
         : 0
-      const available = container.clientHeight - reserved
-      const fitting = Math.max(min, Math.min(max, Math.floor((available + gap) / (measured + gap))))
+      const bar = paginationSelector
+        ? container.parentElement?.querySelector(paginationSelector)
+        : null
+      const barHeight = bar ? bar.getBoundingClientRect().height : paginationHeight
+      const capacity = (height: number) =>
+        Math.max(min, Math.min(max, Math.floor((height + gap) / (measured + gap))))
+
+      const withoutBar = capacity(container.clientHeight + (bar ? barHeight : 0) - reserved)
+      const paginating = rowCount > withoutBar
+      const fitting = paginating ? capacity(container.clientHeight - reserved) : withoutBar
+      const available = paginating
+        ? container.clientHeight - reserved
+        : container.clientHeight + (bar ? barHeight : 0) - reserved
       setRows(fitting)
       setRowHeight(
         naturalRowHeight === undefined || fitting <= 0
@@ -68,7 +98,17 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
     const observer = new ResizeObserver(measure)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [container, rowCount, rowSelector, reservedSelector, naturalRowHeight, min, max])
+  }, [
+    container,
+    rowCount,
+    rowSelector,
+    reservedSelector,
+    naturalRowHeight,
+    paginationSelector,
+    paginationHeight,
+    min,
+    max,
+  ])
 
   return { containerRef: setContainer, rows, rowHeight }
 }

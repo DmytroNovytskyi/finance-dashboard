@@ -35,6 +35,9 @@ interface UncategorizedQueueProps {
 /** How long the search box waits before it asks the server, matching the transactions list. */
 const SEARCH_DEBOUNCE_MS = 350
 
+/** Height of the pagination bar, which the paged lists take out of their row space. */
+const PAGINATION_HEIGHT = 48
+
 /** Unstretched height of one queue row; the rows share whatever height the card has left. */
 const QUEUE_ROW_HEIGHT = 52
 
@@ -72,6 +75,8 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const [page, setPage] = useState(0)
   const { containerRef, rows: perPage, rowHeight } = useFittingRows(rows.length, {
     rowSelector: '[data-row]',
+    paginationSelector: '.MuiTablePagination-root',
+    paginationHeight: PAGINATION_HEIGHT,
     naturalRowHeight: QUEUE_ROW_HEIGHT,
   })
   const maxPage = Math.max(0, Math.ceil(rows.length / perPage) - 1)

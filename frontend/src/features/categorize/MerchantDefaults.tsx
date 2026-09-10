@@ -29,6 +29,9 @@ interface MerchantDefaultsProps {
   categories: CategoryPresentation[]
 }
 
+/** Height of the pagination bar, which the paged lists take out of their row space. */
+const PAGINATION_HEIGHT = 48
+
 /** Unstretched height of one default row; the rows share whatever height the card has left. */
 const DEFAULT_ROW_HEIGHT = 52
 
@@ -59,6 +62,8 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const [page, setPage] = useState(0)
   const { containerRef, rows: perPage, rowHeight } = useFittingRows(orderedRules.length, {
     rowSelector: '[data-row]',
+    paginationSelector: '.MuiTablePagination-root',
+    paginationHeight: PAGINATION_HEIGHT,
     naturalRowHeight: DEFAULT_ROW_HEIGHT,
   })
   const maxPage = Math.max(0, Math.ceil(orderedRules.length / perPage) - 1)
