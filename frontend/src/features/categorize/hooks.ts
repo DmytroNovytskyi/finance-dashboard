@@ -17,14 +17,40 @@ export const QUEUE_SIZE = 200
 /** Which rows the uncategorized queue shows; ALL leaves the nature unfiltered. */
 export type QueueNature = 'EXPENSE' | 'INCOME' | 'ALL'
 
+/** How the uncategorized queue is ordered. */
+export type QueueSort = 'newest' | 'oldest' | 'largest' | 'smallest'
+
 /**
- * Uncategorized transactions. Transfers never appear: they always carry the reserved Internal
- * Transfer category, so the uncategorized filter excludes them however the nature is set.
+ * Maps the queue's sorting onto the list endpoint's. Amounts are signed, so "largest" means the
+ * most negative amount on the expense tab and the most positive on the income tab — ordering by
+ * the raw amount would put the smallest expense first.
  */
-export function useUncategorizedQueue(nature: QueueNature) {
+function queueOrder(sort: QueueSort, nature: QueueNature): { sort: 'date' | 'amount'; order: 'asc' | 'desc' } {
+  switch (sort) {
+    case 'newest':
+      return { sort: 'date', order: 'desc' }
+    case 'oldest':
+      return { sort: 'date', order: 'asc' }
+    case 'largest':
+      return { sort: 'amount', order: nature === 'INCOME' ? 'desc' : 'asc' }
+    case 'smallest':
+      return { sort: 'amount', order: nature === 'INCOME' ? 'asc' : 'desc' }
+  }
+}
+
+/**
+ * Uncategorized transactions. Transfers and refunds never appear: they carry a reserved category,
+ * so the uncategorized filter excludes them however the nature is set. The search runs on the
+ * server, so it reaches every uncategorized row rather than only the page held in the browser.
+ */
+export function useUncategorizedQueue(nature: QueueNature, query: string, sort: QueueSort) {
+  const order = queueOrder(sort, nature)
   const params = {
     uncategorized: true,
     nature: nature === 'ALL' ? undefined : nature,
+    q: query || undefined,
+    sort: order.sort,
+    order: order.order,
     page: 0,
     size: QUEUE_SIZE,
   }

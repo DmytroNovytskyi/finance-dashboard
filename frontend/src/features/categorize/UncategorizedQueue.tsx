@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
@@ -9,6 +9,7 @@ import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import ToggleButton from '@mui/material/ToggleButton'
 import TablePagination from '@mui/material/TablePagination'
+import TextField from '@mui/material/TextField'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
@@ -24,11 +25,15 @@ import {
   useMerchantRules,
   useUncategorizedQueue,
   type QueueNature,
+  type QueueSort,
 } from './hooks'
 
 interface UncategorizedQueueProps {
   categories: CategoryPresentation[]
 }
+
+/** How long the search box waits before it asks the server, matching the transactions list. */
+const SEARCH_DEBOUNCE_MS = 350
 
 /** Unstretched height of one queue row; the rows share whatever height the card has left. */
 const QUEUE_ROW_HEIGHT = 52
@@ -53,7 +58,10 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const [nature, setNature] = useState<QueueNature>('EXPENSE')
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
   const [remember, setRemember] = useState(false)
-  const queue = useUncategorizedQueue(nature)
+  const [search, setSearch] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [sort, setSort] = useState<QueueSort>('newest')
+  const queue = useUncategorizedQueue(nature, appliedSearch, sort)
   const categorizeOne = useCategorizeOne()
   const categorizeBulk = useCategorizeBulk()
   const rules = useMerchantRules()
@@ -71,6 +79,15 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const pageRows = rows.slice(shownPage * perPage, shownPage * perPage + perPage)
   const allPageSelected = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
   const somePageSelected = pageRows.some((row) => selected.has(row.id))
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search)
+      setPage(0)
+      setSelected(new Set())
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const single = selected.size === 1 ? rows.find((row) => selected.has(row.id)) : undefined
   const merchant = single?.merchant ?? null
@@ -141,6 +158,32 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
           <ToggleButton value="INCOME">Income</ToggleButton>
           <ToggleButton value="ALL">All</ToggleButton>
         </ToggleButtonGroup>
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+        <TextField
+          size="small"
+          placeholder="Search description or merchant"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          sx={{ flexGrow: 1, minWidth: 180 }}
+        />
+        <TextField
+          select
+          size="small"
+          label="Sort"
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value as QueueSort)
+            setPage(0)
+          }}
+          sx={{ minWidth: 170 }}
+        >
+          <MenuItem value="newest">Newest first</MenuItem>
+          <MenuItem value="oldest">Oldest first</MenuItem>
+          <MenuItem value="largest">Largest first</MenuItem>
+          <MenuItem value="smallest">Smallest first</MenuItem>
+        </TextField>
       </Box>
 
       <Box
