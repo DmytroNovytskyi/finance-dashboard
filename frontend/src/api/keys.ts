@@ -1,4 +1,4 @@
-import type { StatisticsParams, TransactionListParams } from './endpoints'
+import type { StatementListParams, StatisticsParams, TransactionListParams } from './endpoints'
 
 /** TanStack Query key factories; invalidation targets the root of a group. */
 export const queryKeys = {
@@ -6,6 +6,7 @@ export const queryKeys = {
   categories: ['categories'] as const,
   merchantRules: ['merchant-rules'] as const,
   statements: ['statements'] as const,
+  statementList: (params: StatementListParams) => ['statements', 'list', params] as const,
   statementCoverage: ['statements', 'coverage'] as const,
   transfers: ['transfers'] as const,
   transactions: {

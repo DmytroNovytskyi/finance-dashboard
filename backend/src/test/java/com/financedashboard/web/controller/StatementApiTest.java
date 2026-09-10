@@ -108,4 +108,83 @@ class StatementApiTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/v1/statements/424242"))
                 .andExpect(status().isNotFound());
     }
+
+    private long insertStatementWithPeriod(long accountId, String fileName, String hash,
+            String periodStart, String periodEnd) {
+        return jdbcTemplate.queryForObject("""
+                insert into bank_statement (account_id, bank, file_name, file_hash, period_start,
+                        period_end)
+                values (?, 'PEKAO', ?, ?, ?::date, ?::date) returning id
+                """, Long.class, accountId, fileName, hash, periodStart, periodEnd);
+    }
+
+    @Test
+    void ordersStatementsByTheRequestedColumnAndDirection() throws Exception {
+        long accountId = createAccount("PLN");
+        long march = insertStatementWithPeriod(accountId, "marzec.pdf", "hash-mar",
+                "2026-03-01", "2026-03-31");
+        long january = insertStatementWithPeriod(accountId, "styczeń.pdf", "hash-jan",
+                "2026-01-01", "2026-01-31");
+        long february = insertStatementWithPeriod(accountId, "luty.pdf", "hash-feb",
+                "2026-02-01", "2026-02-28");
+
+        mockMvc.perform(get("/api/v1/statements").param("sort", "period").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(january))
+                .andExpect(jsonPath("$[1].id").value(february))
+                .andExpect(jsonPath("$[2].id").value(march));
+
+        mockMvc.perform(get("/api/v1/statements").param("sort", "file").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(february))
+                .andExpect(jsonPath("$[1].id").value(march))
+                .andExpect(jsonPath("$[2].id").value(january));
+
+        mockMvc.perform(get("/api/v1/statements").param("sort", "period").param("order", "desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(march));
+    }
+
+    @Test
+    void ordersStatementsByAccountName() throws Exception {
+        long personal = createAccount("PLN");
+        long business = createAccount("USD");
+        long personalStatement = insertStatement(personal, "PEKAO", "pln.pdf", "hash-p", true);
+        long businessStatement = insertStatement(business, "PEKAO", "usd.pdf", "hash-b", true);
+
+        mockMvc.perform(get("/api/v1/statements").param("sort", "account").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(personalStatement))
+                .andExpect(jsonPath("$[1].id").value(businessStatement));
+
+        mockMvc.perform(get("/api/v1/statements").param("sort", "account").param("order", "desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(businessStatement))
+                .andExpect(jsonPath("$[1].id").value(personalStatement));
+    }
+
+    @Test
+    void filtersStatementsToOneAccount() throws Exception {
+        long kept = createAccount("PLN");
+        long other = createAccount("USD");
+        long keptStatement = insertStatement(kept, "PEKAO", "pln.pdf", "hash-kept", true);
+        insertStatement(other, "PEKAO", "usd.pdf", "hash-other", true);
+
+        mockMvc.perform(get("/api/v1/statements").param("accountId", String.valueOf(kept)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(keptStatement));
+    }
+
+    @Test
+    void fallsBackToNewestImportForAnUnknownSortColumn() throws Exception {
+        long accountId = createAccount("PLN");
+        long older = insertStatement(accountId, "PEKAO", "sierpień.pdf", "hash-old", false);
+        long newer = insertStatement(accountId, "PEKAO", "wrzesień.pdf", "hash-new", true);
+
+        mockMvc.perform(get("/api/v1/statements").param("sort", "nonsense").param("order", "sideways"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(newer))
+                .andExpect(jsonPath("$[1].id").value(older));
+    }
 }

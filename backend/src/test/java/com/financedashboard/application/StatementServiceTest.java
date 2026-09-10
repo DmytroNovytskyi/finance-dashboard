@@ -9,6 +9,8 @@ import com.financedashboard.application.StatementService.StatementSummary;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.statement.BankStatement;
+import com.financedashboard.domain.statement.StatementOrder;
+import com.financedashboard.domain.statement.StatementSortField;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -44,13 +46,14 @@ class StatementServiceTest {
     }
 
     @Test
-    void listsStatementsNewestFirstWithTheirCounts() {
+    void listsStatementsInTheRequestedOrderWithTheirCounts() {
         BankStatement older = statement(1L);
         BankStatement newer = statement(2L);
-        when(statements.findAllByOrderByImportedAtDesc()).thenReturn(List.of(newer, older));
+        StatementOrder order = new StatementOrder(StatementSortField.IMPORTED, false);
+        when(statements.findAll(order, null)).thenReturn(List.of(newer, older));
         when(transactions.countByStatementIds(List.of(2L, 1L))).thenReturn(Map.of(2L, 5L));
 
-        List<StatementSummary> summaries = service.list();
+        List<StatementSummary> summaries = service.list(order, null);
 
         assertThat(summaries).extracting(StatementSummary::statement).containsExactly(newer, older);
         assertThat(summaries.get(0).transactionCount()).isEqualTo(5L);
@@ -58,10 +61,22 @@ class StatementServiceTest {
     }
 
     @Test
-    void returnsEmptyWhenNoStatementsImported() {
-        when(statements.findAllByOrderByImportedAtDesc()).thenReturn(List.of());
+    void restrictsTheListToOneAccountWhenAsked() {
+        StatementOrder order = new StatementOrder(StatementSortField.PERIOD, true);
+        when(statements.findAll(order, 7L)).thenReturn(List.of(statement(1L)));
+        when(transactions.countByStatementIds(List.of(1L))).thenReturn(Map.of());
 
-        assertThat(service.list()).isEmpty();
+        assertThat(service.list(order, 7L)).hasSize(1);
+
+        verify(statements).findAll(order, 7L);
+    }
+
+    @Test
+    void returnsEmptyWhenNoStatementsImported() {
+        StatementOrder order = new StatementOrder(StatementSortField.IMPORTED, false);
+        when(statements.findAll(order, null)).thenReturn(List.of());
+
+        assertThat(service.list(order, null)).isEmpty();
 
         verify(transactions, never()).countByStatementIds(org.mockito.ArgumentMatchers.any());
     }

@@ -114,8 +114,10 @@ its transactions (un-pairing any surviving transfer leg).
 Statements: `POST /api/v1/statements` (multipart import; the owning account is read from the
 statement — by its account number, else its currency — and created if unknown, so no account is
 chosen at upload),
-`GET /api/v1/statements` (list, newest first, each with the count of stored transactions it
-introduced), `DELETE /api/v1/statements/{id}` (removes the statement and the transaction rows
+`GET /api/v1/statements?[sort][&order][&accountId]` (list, each with the count of stored
+transactions it introduced; ordered by `sort` = `imported|file|account|period` with `order` =
+`asc|desc`, defaulting to newest import, and optionally restricted to one account — an
+unrecognised `sort` falls back to that default), `DELETE /api/v1/statements/{id}` (removes the statement and the transaction rows
 it introduced, un-pairing any surviving transfer leg, so its file can be re-imported; an account
 left with no transactions or statements is removed as well), and
 `GET /api/v1/statements/coverage` (per account, the earliest and latest period covered, any hole

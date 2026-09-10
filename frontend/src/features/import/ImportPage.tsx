@@ -1,5 +1,5 @@
-import { useRef, useState, type DragEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useRef, useState, type DragEvent } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -13,9 +13,10 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
 import FileUpload from '@mui/icons-material/FileUpload'
-import Grid from '@mui/material/Grid'
 import IconButton from '@mui/material/IconButton'
+import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
+import Select from '@mui/material/Select'
 import Snackbar from '@mui/material/Snackbar'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -24,13 +25,26 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TablePagination from '@mui/material/TablePagination'
 import TableRow from '@mui/material/TableRow'
+import TableSortLabel from '@mui/material/TableSortLabel'
 import Typography from '@mui/material/Typography'
-import { statementsApi } from '../../api/endpoints'
+import { statementsApi, type StatementSortKey } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
-import { useAccountsById } from '../../api/queries'
+import { useAccounts, useAccountsById } from '../../api/queries'
+import { PageHeader, PageShell } from '../../components/PageLayout'
 import { formatDate, formatDateTime, formatInteger } from '../../lib/format'
 
 const PAGE_SIZES = [8, 15, 30]
+
+/** Current server-side sort of the statements list. */
+interface StatementSort {
+  key: StatementSortKey
+  dir: 'asc' | 'desc'
+}
+
+const DEFAULT_STATEMENT_SORT: StatementSort = { key: 'imported', dir: 'desc' }
+
+/** Account-filter sentinel; real account ids start at 1, so 0 means "no account restriction". */
+const ALL_ACCOUNTS = 0
 
 interface ImportOutcome {
   ok: number
@@ -52,14 +66,49 @@ export function ImportPage() {
   const [failure, setFailure] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const statementsQuery = useQuery({ queryKey: queryKeys.statements, queryFn: statementsApi.list })
+  const accounts = useAccounts().data ?? []
+  const [sort, setSort] = useState<StatementSort>(DEFAULT_STATEMENT_SORT)
+  const [accountFilter, setAccountFilter] = useState(ALL_ACCOUNTS)
+  const listParams = useMemo(
+    () => ({
+      sort: sort.key,
+      order: sort.dir,
+      accountId: accountFilter === ALL_ACCOUNTS ? undefined : accountFilter,
+    }),
+    [sort, accountFilter],
+  )
+  const statementsQuery = useQuery({
+    queryKey: queryKeys.statementList(listParams),
+    queryFn: () => statementsApi.list(listParams),
+    placeholderData: keepPreviousData,
+  })
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [confirmDeleteMany, setConfirmDeleteMany] = useState(false)
   const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
 
   const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZES[0])
+  const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZES[1])
+
+  const changeSort = (key: StatementSortKey) => {
+    setSort((current) =>
+      current.key === key ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    )
+    setPage(0)
+  }
+
+  const sortProps = (key: StatementSortKey) => ({
+    active: sort.key === key,
+    direction: (sort.key === key ? sort.dir : 'asc') as 'asc' | 'desc',
+    onClick: () => changeSort(key),
+  })
+
+  /** Changing the account drops the selection so a filtered-out row cannot be deleted unseen. */
+  const changeAccountFilter = (value: number) => {
+    setAccountFilter(value)
+    setSelected(new Set())
+    setPage(0)
+  }
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.statements })
@@ -188,18 +237,22 @@ export function ImportPage() {
   const snackbarMessage = deleteNotice ?? outcomeSummary
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Import
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Upload bank statement PDFs in one go. Each account is read from its file and reused or created automatically.
-        </Typography>
-      </Box>
+    <PageShell>
+      <PageHeader
+        title="Import"
+        subtitle="Upload bank statement PDFs in one go. Each account is read from its file and reused or created automatically."
+      />
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 2,
+          flex: { xs: 'none', md: 1 },
+          minHeight: 0,
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: { xs: 'none', md: '1 1 30%' }, minWidth: 0, minHeight: 0 }}>
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
             <Typography variant="h6" component="h3">
               Upload statements
@@ -265,10 +318,20 @@ export function ImportPage() {
               {busy ? 'Importing…' : `Import${files.length > 1 ? ` ${files.length} files` : ''}`}
             </Button>
           </Paper>
-        </Grid>
+        </Box>
 
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 62%', minWidth: 0, minHeight: 0 }}>
+          <Paper
+            variant="outlined"
+            sx={{
+              borderRadius: 3,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              minHeight: 320,
+            }}
+          >
             <Box sx={{ px: 2.5, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
               <Box>
                 <Typography variant="h6" component="h3">
@@ -278,21 +341,43 @@ export function ImportPage() {
                   Select rows to delete several at once.
                 </Typography>
               </Box>
-              {selected.size > 0 ? (
-                <Button
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Select
                   size="small"
-                  color="error"
-                  variant="outlined"
-                  startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : <Delete />}
-                  onClick={() => setConfirmDeleteMany(true)}
-                  disabled={deleting}
+                  displayEmpty
+                  value={accountFilter}
+                  onChange={(event) => changeAccountFilter(Number(event.target.value))}
+                  renderValue={(value) =>
+                    value === ALL_ACCOUNTS
+                      ? 'All accounts'
+                      : accountsById.get(value)?.name ?? `Account ${value}`
+                  }
+                  aria-label="Filter statements by account"
+                  sx={{ minWidth: 180, '.MuiSelect-select': { py: 0.75 } }}
                 >
-                  Delete {selected.size}
-                </Button>
-              ) : null}
+                  <MenuItem value={ALL_ACCOUNTS}>All accounts</MenuItem>
+                  {accounts.map((account) => (
+                    <MenuItem key={account.id} value={account.id}>
+                      {account.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {selected.size > 0 ? (
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : <Delete />}
+                    onClick={() => setConfirmDeleteMany(true)}
+                    disabled={deleting}
+                  >
+                    Delete {selected.size}
+                  </Button>
+                ) : null}
+              </Box>
             </Box>
-            <TableContainer>
-              <Table size="small">
+            <TableContainer sx={{ flex: 1, minHeight: 0 }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell padding="checkbox">
@@ -304,11 +389,19 @@ export function ImportPage() {
                         aria-label="Select all on this page"
                       />
                     </TableCell>
-                    <TableCell>File</TableCell>
-                    <TableCell>Account</TableCell>
-                    <TableCell>Period</TableCell>
+                    <TableCell>
+                      <TableSortLabel {...sortProps('file')}>File</TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel {...sortProps('account')}>Account</TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel {...sortProps('period')}>Period</TableSortLabel>
+                    </TableCell>
                     <TableCell align="right">Rows</TableCell>
-                    <TableCell>Imported</TableCell>
+                    <TableCell>
+                      <TableSortLabel {...sortProps('imported')}>Imported</TableSortLabel>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -324,7 +417,9 @@ export function ImportPage() {
                     <TableRow>
                       <TableCell colSpan={6}>
                         <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                          No statements imported yet.
+                          {accountFilter === ALL_ACCOUNTS
+                            ? 'No statements imported yet.'
+                            : 'No statements for this account.'}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -383,8 +478,8 @@ export function ImportPage() {
               />
             ) : null}
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => { setOutcome(null); setDeleteNotice(null) }} message={snackbarMessage} />
 
@@ -402,6 +497,6 @@ export function ImportPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </PageShell>
   )
 }

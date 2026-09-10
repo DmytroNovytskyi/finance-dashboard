@@ -4,11 +4,11 @@ import com.financedashboard.infrastructure.persistence.entity.BankStatementEntit
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 /** Spring Data repository for the {@code bank_statement} table. */
-public interface BankStatementJpaRepository extends JpaRepository<BankStatementEntity, Long> {
-
-    List<BankStatementEntity> findAllByOrderByImportedAtDesc();
+public interface BankStatementJpaRepository
+        extends JpaRepository<BankStatementEntity, Long>, JpaSpecificationExecutor<BankStatementEntity> {
 
     List<BankStatementEntity> findAllByOrderByPeriodStartAsc();
 

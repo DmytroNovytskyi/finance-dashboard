@@ -3,6 +3,7 @@ package com.financedashboard.application;
 import com.financedashboard.domain.port.BankStatementRepository;
 import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.statement.BankStatement;
+import com.financedashboard.domain.statement.StatementOrder;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +22,11 @@ public class StatementService {
     }
 
     /**
-     * Returns all imported statements, most recently imported first, each paired with the count of
-     * stored transactions it produced.
+     * Returns all imported statements in the given order, optionally restricted to one account,
+     * each paired with the count of stored transactions it produced.
      */
-    public List<StatementSummary> list() {
-        List<BankStatement> all = statements.findAllByOrderByImportedAtDesc();
+    public List<StatementSummary> list(StatementOrder order, Long accountId) {
+        List<BankStatement> all = statements.findAll(order, accountId);
         if (all.isEmpty()) {
             return List.of();
         }
