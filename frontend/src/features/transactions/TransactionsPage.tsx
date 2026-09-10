@@ -94,9 +94,7 @@ export function TransactionsPage() {
   })
 
   useEffect(() => {
-    if (rowsPerPage === size) return
-    setSize(rowsPerPage)
-    setPage(0)
+    if (rowsPerPage !== size) setSize(rowsPerPage)
   }, [rowsPerPage, size])
 
   const suggestionsQuery = useTransferSuggestions()

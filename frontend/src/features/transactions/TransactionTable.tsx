@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
@@ -206,13 +207,17 @@ export function TransactionTable({
   const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1)
   const shownPage = Math.min(page, maxPage)
 
+  useEffect(() => {
+    if (shownPage !== page) onPageChange(shownPage)
+  }, [shownPage, page, onPageChange])
+
   return (
     <Paper
       variant="outlined"
       sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 140 }}
     >
       <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0 }}>
-        <Table size="small" stickyHeader sx={{ minWidth: 860 }}>
+        <Table size="small" stickyHeader sx={{ minWidth: 860, tableLayout: 'fixed' }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 110 }}>
@@ -253,15 +258,17 @@ export function TransactionTable({
                     <TableCell>
                       {isSuggested ? <PairTag label="Internal" /> : null}
                       {isRefundSuggested ? <PairTag label="Refund" /> : null}
-                      <Typography variant="body2">{transaction.description || transaction.merchant || '—'}</Typography>
+                      <Typography variant="body2" noWrap>
+                        {transaction.description || transaction.merchant || '—'}
+                      </Typography>
                       {transaction.merchant && transaction.merchant !== transaction.description ? (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                           {transaction.merchant}
                         </Typography>
                       ) : null}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" noWrap>
                         {account?.name ?? `Account ${transaction.accountId}`}
                       </Typography>
                     </TableCell>
