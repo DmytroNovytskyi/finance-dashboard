@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import Box from '@mui/material/Box'
+import Checkbox from '@mui/material/Checkbox'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
@@ -42,6 +43,16 @@ interface TransactionTableProps {
   rowsPerPage: number
   /** Height each row takes so the page fills the table, or null before it has been measured. */
   rowHeight: number | null
+  /** Whether the page is in edit mode: selection, linking and category editing are offered. */
+  editMode: boolean
+  /** Ids of the selected rows; only meaningful in edit mode. */
+  selected: ReadonlySet<number>
+  /** Whether every row on the current page is selected, for the header checkbox. */
+  allPageSelected: boolean
+  /** Whether some but not all rows on the page are selected. */
+  somePageSelected: boolean
+  onToggleSelect: (transaction: Transaction) => void
+  onSelectPage: (checked: boolean) => void
   page: number
   onPageChange: (page: number) => void
   /** Ids of the legs of pending internal-transfer suggestions; those rows get an "Internal" tag. */
@@ -85,11 +96,21 @@ function PairedCategoryCell({
   label,
   action,
   onUnlink,
+  editable,
 }: {
   label: string
   action: string
   onUnlink: () => void
+  /** Whether the unlink button is offered; it is an editing action, so read mode shows the label alone. */
+  editable: boolean
 }) {
+  if (!editable) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+    )
+  }
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       <Typography variant="body2" color="text.secondary">
@@ -124,22 +145,43 @@ function AmountCell({ transaction }: { transaction: Transaction }) {
 function CategoryCell({
   transaction,
   categories,
+  editable,
   onCategoryChange,
   onUnlink,
   onUnlinkRefund,
 }: {
   transaction: Transaction
   categories: CategoryPresentation[]
+  /** Whether the category may be changed; read mode shows the name alone. */
+  editable: boolean
   onCategoryChange: (id: number, categoryId: number | null) => void
   onUnlink: (id: number) => void
   onUnlinkRefund: (id: number) => void
 }) {
+  const nameOf = (id: number) => categories.find((category) => category.id === id)?.name ?? null
+
+  if (!editable) {
+    const paired =
+      transaction.nature === 'TRANSFER'
+        ? 'Internal Transfer'
+        : transaction.nature === 'REFUND'
+          ? 'Refund'
+          : null
+    const label = paired ?? nameOf(transaction.categoryId ?? -1)
+    return (
+      <Typography variant="body2" color={label ? 'text.secondary' : 'text.disabled'} noWrap>
+        {label ?? 'Uncategorized'}
+      </Typography>
+    )
+  }
+
   if (transaction.nature === 'TRANSFER') {
     return (
       <PairedCategoryCell
         label="Internal Transfer"
         action="Revert transfer to a normal expense/income"
         onUnlink={() => onUnlink(transaction.id)}
+        editable={editable}
       />
     )
   }
@@ -149,12 +191,13 @@ function CategoryCell({
         label="Refund"
         action="Unlink the refund from its purchase"
         onUnlink={() => onUnlinkRefund(transaction.id)}
+        editable={editable}
       />
     )
   }
-  const editable = categories.filter((category) => !category.system)
+  const assignable = categories.filter((category) => !category.system)
   const value =
-    transaction.categoryId !== null && editable.some((category) => category.id === transaction.categoryId)
+    transaction.categoryId !== null && assignable.some((category) => category.id === transaction.categoryId)
       ? String(transaction.categoryId)
       : 'none'
   return (
@@ -172,7 +215,7 @@ function CategoryCell({
           Uncategorized
         </Typography>
       </MenuItem>
-      {editable.map((category) => (
+      {assignable.map((category) => (
         <MenuItem key={category.id} value={String(category.id)}>
           <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
             <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: category.color, display: 'inline-block' }} />
@@ -194,6 +237,12 @@ export function TransactionTable({
   containerRef,
   rowsPerPage,
   rowHeight,
+  editMode,
+  selected,
+  allPageSelected,
+  somePageSelected,
+  onToggleSelect,
+  onSelectPage,
   page,
   onPageChange,
   suggestionIds,
@@ -234,6 +283,17 @@ export function TransactionTable({
         <Table size="small" stickyHeader sx={{ minWidth: 860, tableLayout: 'fixed' }}>
           <TableHead>
             <TableRow>
+              {editMode ? (
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    indeterminate={somePageSelected && !allPageSelected}
+                    checked={allPageSelected}
+                    onChange={(event) => onSelectPage(event.target.checked)}
+                    aria-label="Select all on this page"
+                  />
+                </TableCell>
+              ) : null}
               <TableCell sx={{ width: 110 }}>
                 <TableSortLabel {...sortProps('date')}>Date</TableSortLabel>
               </TableCell>
@@ -252,7 +312,7 @@ export function TransactionTable({
           <TableBody>
             {allRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={editMode ? 6 : 5}>
                   <Box sx={{ py: 6, textAlign: 'center' }}>
                     <Typography color="text.secondary">No transactions match these filters.</Typography>
                   </Box>
@@ -266,6 +326,16 @@ export function TransactionTable({
                   transaction.nature !== 'REFUND' && refundSuggestionIds.has(transaction.id)
                 return (
                   <TableRow key={transaction.id} hover sx={{ height: rowHeight ?? TABLE_ROW_HEIGHT }}>
+                    {editMode ? (
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          checked={selected.has(transaction.id)}
+                          onChange={() => onToggleSelect(transaction)}
+                          aria-label={`Select transaction ${transaction.id}`}
+                        />
+                      </TableCell>
+                    ) : null}
                     <TableCell sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {formatDate(transaction.transactionDate)}
                     </TableCell>
@@ -292,6 +362,7 @@ export function TransactionTable({
                       <CategoryCell
                         transaction={transaction}
                         categories={categories}
+                        editable={editMode}
                         onCategoryChange={onCategoryChange}
                         onUnlink={onUnlink}
                         onUnlinkRefund={onUnlinkRefund}

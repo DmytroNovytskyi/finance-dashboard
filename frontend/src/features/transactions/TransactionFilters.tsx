@@ -1,7 +1,9 @@
 import Button from '@mui/material/Button'
+import Edit from '@mui/icons-material/Edit'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
 import type { AccountPresentation, CategoryPresentation } from '../../api/queries'
 import type { TransactionNature } from '../../types'
 import { hasFilters, type TxFilters } from './model'
@@ -10,12 +12,23 @@ interface TransactionFiltersProps {
   filters: TxFilters
   accounts: AccountPresentation[]
   categories: CategoryPresentation[]
+  /** Whether the page is in edit mode; the toggle in this bar drives it. */
+  editMode: boolean
   onChange: (filters: TxFilters) => void
   onClear: () => void
+  onEditModeChange: (editMode: boolean) => void
 }
 
-/** Filter bar for the transactions list: search, account, category, nature, date range. */
-export function TransactionFilters({ filters, accounts, categories, onChange, onClear }: TransactionFiltersProps) {
+/** Filter bar for the transactions list: search, account, category, nature, date range, edit mode. */
+export function TransactionFilters({
+  filters,
+  accounts,
+  categories,
+  editMode,
+  onChange,
+  onClear,
+  onEditModeChange,
+}: TransactionFiltersProps) {
   const patch = (changes: Partial<TxFilters>) => onChange({ ...filters, ...changes })
 
   const setSearch = (value: string) => {
@@ -110,6 +123,17 @@ export function TransactionFilters({ filters, accounts, categories, onChange, on
           Clear
         </Button>
       ) : null}
+      <ToggleButton
+        size="small"
+        value="edit"
+        selected={editMode}
+        onChange={() => onEditModeChange(!editMode)}
+        sx={{ ml: 'auto' }}
+        aria-label="Edit transactions"
+      >
+        <Edit fontSize="small" sx={{ mr: 0.5 }} />
+        Edit
+      </ToggleButton>
     </Paper>
   )
 }

@@ -18,10 +18,11 @@ import { refundsApi, transactionsApi, transfersApi } from '../../api/endpoints'
 import { buildQuery } from '../../api/client'
 import { queryKeys } from '../../api/keys'
 import type { AccountPresentation } from '../../api/queries'
-import type { RefundSuggestion, TransferSuggestion } from '../../types'
+import type { RefundSuggestion, Transaction, TransferSuggestion } from '../../types'
 import { PageHeader, PageShell } from '../../components/PageLayout'
 import { useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
+import { LinkActions } from './LinkActions'
 import { useFittingRows } from '../../hooks/useFittingRows'
 import { RefundSuggestionRow, TransferSuggestionRow } from './SuggestionRows'
 import { TransactionFilters } from './TransactionFilters'
@@ -52,6 +53,8 @@ export function TransactionsPage() {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(DEFAULT_PAGE_SIZE)
   const [appliedQ, setAppliedQ] = useState('')
+  const [editMode, setEditMode] = useState(false)
+  const [selected, setSelected] = useState<ReadonlyMap<number, Transaction>>(new Map())
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [snackbar, setSnackbar] = useState<string | null>(null)
 
@@ -97,6 +100,34 @@ export function TransactionsPage() {
   useEffect(() => {
     if (rowsPerPage !== size) setSize(rowsPerPage)
   }, [rowsPerPage, size])
+
+  useEffect(() => {
+    setSelected(new Map())
+  }, [filters, sort, editMode])
+
+  const pageRows = listQuery.data?.content ?? []
+  const allPageSelected = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
+  const somePageSelected = pageRows.some((row) => selected.has(row.id))
+
+  const toggleSelect = (transaction: Transaction) => {
+    setSelected((current) => {
+      const next = new Map(current)
+      if (next.has(transaction.id)) next.delete(transaction.id)
+      else next.set(transaction.id, transaction)
+      return next
+    })
+  }
+
+  const selectPage = (checked: boolean) => {
+    setSelected((current) => {
+      const next = new Map(current)
+      for (const row of pageRows) {
+        if (checked) next.set(row.id, row)
+        else next.delete(row.id)
+      }
+      return next
+    })
+  }
 
   const suggestionsQuery = useTransferSuggestions()
   const suggestionIds = useMemo(() => {
@@ -161,6 +192,32 @@ export function TransactionsPage() {
   })
 
   const changeCategory = (id: number, categoryId: number | null) => categorizeOne.mutate({ id, categoryId })
+
+  const invalidateAfterLink = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.transfers })
+    queryClient.invalidateQueries({ queryKey: queryKeys.refunds })
+    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.root })
+    queryClient.invalidateQueries({ queryKey: queryKeys.statistics.root })
+  }
+  const linkRefundMutation = useMutation({
+    mutationFn: ({ purchaseId, refundIds }: { purchaseId: number; refundIds: number[] }) =>
+      refundsApi.pair(purchaseId, refundIds),
+    onSuccess: (result) => {
+      invalidateAfterLink()
+      setSelected(new Map())
+      setSnackbar(`Linked ${result.refunds.length + 1} transactions as a refund.`)
+    },
+    onError: (error: Error) => setSnackbar(error.message),
+  })
+  const linkTransferMutation = useMutation({
+    mutationFn: ({ fromId, toId }: { fromId: number; toId: number }) => transfersApi.pair(fromId, toId),
+    onSuccess: () => {
+      invalidateAfterLink()
+      setSelected(new Map())
+      setSnackbar('Linked the two transactions as an internal transfer.')
+    },
+    onError: (error: Error) => setSnackbar(error.message),
+  })
 
   /**
    * Shows exactly the given rows. The filters are set here as well as written to the URL: the list
@@ -258,7 +315,25 @@ export function TransactionsPage() {
         />
       ) : null}
 
-      <TransactionFilters filters={filters} accounts={accounts} categories={categories} onChange={applyFilters} onClear={clearFilters} />
+      <TransactionFilters
+        filters={filters}
+        accounts={accounts}
+        categories={categories}
+        editMode={editMode}
+        onChange={applyFilters}
+        onClear={clearFilters}
+        onEditModeChange={setEditMode}
+      />
+
+      {editMode && selected.size > 0 ? (
+        <LinkActions
+          selected={[...selected.values()]}
+          busy={linkRefundMutation.isPending || linkTransferMutation.isPending}
+          onLinkRefund={(purchaseId, refundIds) => linkRefundMutation.mutate({ purchaseId, refundIds })}
+          onLinkTransfer={(fromId, toId) => linkTransferMutation.mutate({ fromId, toId })}
+          onClear={() => setSelected(new Map())}
+        />
+      ) : null}
 
       {listQuery.isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}>
@@ -279,6 +354,12 @@ export function TransactionsPage() {
             containerRef={containerRef}
             rowsPerPage={rowsPerPage}
             rowHeight={rowHeight}
+            editMode={editMode}
+            selected={new Set(selected.keys())}
+            allPageSelected={allPageSelected}
+            somePageSelected={somePageSelected}
+            onToggleSelect={toggleSelect}
+            onSelectPage={selectPage}
             page={page}
             onPageChange={setPage}
             suggestionIds={suggestionIds}
