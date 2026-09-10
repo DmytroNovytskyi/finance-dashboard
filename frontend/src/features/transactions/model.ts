@@ -48,6 +48,24 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
 }
 
 /** Converts the filters into API list parameters (uncategorized and categoryId are exclusive). */
+/**
+ * The words that stand for the pair tags rather than for text to match. Typing one selects the rows
+ * carrying that tag, which is knowledge the list only has because it fetched the suggestions; the
+ * tag itself is not stored on the transaction.
+ */
+const TAG_WORDS: Record<string, 'refund' | 'internal'> = {
+  refund: 'refund',
+  refunds: 'refund',
+  internal: 'internal',
+  transfer: 'internal',
+  transfers: 'internal',
+}
+
+/** Which tag a search box value stands for, or null when it is ordinary search text. */
+export function tagWordOf(value: string): 'refund' | 'internal' | null {
+  return TAG_WORDS[value.trim().toLowerCase()] ?? null
+}
+
 export function toListParams(
   filters: TxFilters,
   page: number,
@@ -61,7 +79,7 @@ export function toListParams(
     nature: filters.nature,
     from: filters.from || undefined,
     to: filters.to || undefined,
-    q: filters.q || undefined,
+    q: filters.ids && filters.ids.length > 0 ? undefined : filters.q || undefined,
     ids: filters.ids && filters.ids.length > 0 ? filters.ids : undefined,
     ...(sort ? { sort: sort.key, order: sort.dir } : {}),
     page,

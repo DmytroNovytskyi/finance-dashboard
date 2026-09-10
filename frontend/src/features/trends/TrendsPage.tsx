@@ -255,8 +255,14 @@ export function TrendsPage() {
                 key={category.id}
                 label={category.name}
                 onDelete={() => removeCategory(category.id)}
-                size="small"
                 variant="outlined"
+                sx={{
+                  height: 44,
+                  borderRadius: 2,
+                  pl: 0.5,
+                  '.MuiChip-label': { px: 1.5, fontSize: '0.9375rem' },
+                  '.MuiChip-deleteIcon': { fontSize: 20, mr: 1 },
+                }}
               />
             ))}
           </Box>

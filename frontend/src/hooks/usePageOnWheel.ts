@@ -60,6 +60,9 @@ function startsInNestedScroller(event: WheelEvent, container: HTMLElement): bool
 /**
  * Turns pages when the wheel is scrolled over a paged list.
  *
+ * Scrolling up moves forward a page and scrolling down moves back, which is the direction the user
+ * asked for and the opposite of reading order.
+ *
  * A mouse notch turns exactly one page: the distances accumulate and the total is reset on every
  * turn, so two notches advance two pages and three advance three. The total is reset rather than
  * reduced by the step because a remainder would double-count — a 100 pixel notch against a 40
@@ -83,7 +86,7 @@ export function usePageOnWheel(container: HTMLElement | null, options: PageOnWhe
     if (startsInNestedScroller(event, container!)) return
     travelled.current += distance
     if (Math.abs(travelled.current) < STEP_PX) return
-    const forward = travelled.current > 0
+    const forward = travelled.current < 0
     if (forward ? !canNext : !canPrevious) {
       travelled.current = 0
       return

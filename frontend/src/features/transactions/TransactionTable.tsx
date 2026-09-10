@@ -24,11 +24,13 @@ import type { TransactionSortKey } from '../../api/endpoints'
 import type { TransactionSort } from './model'
 
 /**
- * Unstretched height of one row: the tallest a row gets now that its description, counterparty and
- * account are each held to a single line. Rows share out whatever height the table has left, and
- * this is the floor that share is worked out from, so a page always fills the table exactly.
+ * Unstretched height of one row, taken from the tallest a row gets: three lines when it carries a
+ * pair tag above a two-line description, and two otherwise. Rows share out whatever height the
+ * table has left, and this is the floor that share is worked out from, so the page always fills
+ * the table exactly and never scrolls. Taking the shorter height instead would let a page holding
+ * a tagged row overflow, because a stretched row cannot be shorter than its own content.
  */
-export const TABLE_ROW_HEIGHT = 53
+export const TABLE_ROW_HEIGHT = 75
 
 interface TransactionTableProps {
   data: PageResponse<Transaction> | undefined
@@ -65,8 +67,9 @@ interface TransactionTableProps {
 }
 
 /**
- * The bordered tag that marks a row as part of a detected pair. It sits on the description's line
- * rather than above it, so it must never be the thing that gives way when space is short.
+ * The bordered tag that marks a row as part of a detected pair. It is inline-block, and the
+ * description below it is a block, so the tag takes a line of its own and its left edge lines up
+ * with the description and the counterparty under it.
  */
 function PairTag({ label }: { label: string }) {
   return (
@@ -82,7 +85,8 @@ function PairTag({ label }: { label: string }) {
         px: 0.75,
         py: 0,
         lineHeight: 1.2,
-        flexShrink: 0,
+        display: 'inline-block',
+        mb: 0.25,
         whiteSpace: 'nowrap',
       }}
     >
@@ -340,13 +344,11 @@ export function TransactionTable({
                       {formatDate(transaction.transactionDate)}
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                        {isSuggested ? <PairTag label="Internal" /> : null}
-                        {isRefundSuggested ? <PairTag label="Refund" /> : null}
-                        <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
-                          {transaction.description || transaction.merchant || '—'}
-                        </Typography>
-                      </Box>
+                      {isSuggested ? <PairTag label="Internal" /> : null}
+                      {isRefundSuggested ? <PairTag label="Refund" /> : null}
+                      <Typography variant="body2" noWrap>
+                        {transaction.description || transaction.merchant || '—'}
+                      </Typography>
                       {transaction.merchant && transaction.merchant !== transaction.description ? (
                         <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                           {transaction.merchant}

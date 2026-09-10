@@ -6,7 +6,7 @@ import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import type { AccountPresentation, CategoryPresentation } from '../../api/queries'
 import type { TransactionNature } from '../../types'
-import { hasFilters, type TxFilters } from './model'
+import { hasFilters, tagWordOf, type TxFilters } from './model'
 
 interface TransactionFiltersProps {
   filters: TxFilters
@@ -14,6 +14,8 @@ interface TransactionFiltersProps {
   categories: CategoryPresentation[]
   /** Whether the page is in edit mode; the toggle in this bar drives it. */
   editMode: boolean
+  /** Ids of the rows carrying each pair tag, so a tag word in the search box can select them. */
+  taggedIds: { refund: number[]; internal: number[] }
   onChange: (filters: TxFilters) => void
   onClear: () => void
   onEditModeChange: (editMode: boolean) => void
@@ -25,6 +27,7 @@ export function TransactionFilters({
   accounts,
   categories,
   editMode,
+  taggedIds,
   onChange,
   onClear,
   onEditModeChange,
@@ -35,9 +38,14 @@ export function TransactionFilters({
     const tokens = value.trim().split(/\s+/).filter(Boolean)
     if (tokens.length > 0 && tokens.every((token) => /^\d+$/.test(token))) {
       patch({ ids: tokens.map(Number), q: '' })
-    } else {
-      patch({ ids: undefined, q: value })
+      return
     }
+    const tag = tagWordOf(value)
+    if (tag) {
+      patch({ ids: taggedIds[tag], q: value.trim() })
+      return
+    }
+    patch({ ids: undefined, q: value })
   }
 
   const setCategory = (value: string) => {
@@ -53,7 +61,7 @@ export function TransactionFilters({
       <TextField
         size="small"
         placeholder="Search description, merchant, or transaction ids"
-        value={filters.ids && filters.ids.length > 0 ? filters.ids.join(' ') : filters.q}
+        value={filters.q || (filters.ids && filters.ids.length > 0 ? filters.ids.join(' ') : '')}
         onChange={(event) => setSearch(event.target.value)}
         sx={{ flexGrow: 1, minWidth: 220 }}
       />

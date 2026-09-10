@@ -331,6 +331,10 @@ export function TransactionsPage() {
         accounts={accounts}
         categories={categories}
         editMode={editMode}
+        taggedIds={{
+          refund: [...refundSuggestionIds],
+          internal: [...suggestionIds],
+        }}
         onChange={applyFilters}
         onClear={clearFilters}
         onEditModeChange={setEditMode}
