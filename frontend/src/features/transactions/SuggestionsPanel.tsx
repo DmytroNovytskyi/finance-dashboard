@@ -10,8 +10,13 @@ import { useFittingRows } from '../../hooks/useFittingRows'
 /** Unstretched height of one suggestion row; the list shows as many of them as its height allows. */
 const SUGGESTION_ROW_HEIGHT = 56
 
-/** Height of the pagination toolbar, taken out of the list so the panel never grows. */
-const PAGINATION_HEIGHT = 36
+/**
+ * What the list gives up for the bar, which is MUI's default toolbar height. Reserving less lets
+ * the list and the bar together overrun the budget above by the difference the moment the bar
+ * appears. Pinning the toolbar's min-height does not help: the bar's own content already sets its
+ * height, so the override would be inert while the reservation stayed wrong.
+ */
+const PAGINATION_HEIGHT = 52
 
 /**
  * The list is a fixed slice of the page rather than a content-sized box. That matters: the row
@@ -132,7 +137,7 @@ export function SuggestionsPanel<T>({
           rowsPerPage={perPage}
           rowsPerPageOptions={[]}
           labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
-          sx={{ flexShrink: 0, '.MuiTablePagination-toolbar': { minHeight: PAGINATION_HEIGHT } }}
+          sx={{ flexShrink: 0 }}
         />
       ) : null}
     </Paper>
