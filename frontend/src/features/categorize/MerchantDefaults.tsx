@@ -29,6 +29,9 @@ interface MerchantDefaultsProps {
   categories: CategoryPresentation[]
 }
 
+/** Unstretched height of one default row; the rows share whatever height the card has left. */
+const DEFAULT_ROW_HEIGHT = 54
+
 /** Lists merchant→category defaults and lets each be applied to matching uncategorized rows. */
 export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const scheme = useScheme()
@@ -54,7 +57,10 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   }, [rules.data, categories])
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(orderedRules.length, { rowSelector: '[data-row]' })
+  const { containerRef, rows: perPage } = useFittingRows(orderedRules.length, {
+    rowSelector: '[data-row]',
+    naturalRowHeight: DEFAULT_ROW_HEIGHT,
+  })
   const maxPage = Math.max(0, Math.ceil(orderedRules.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageRules = orderedRules.slice(shownPage * perPage, shownPage * perPage + perPage)
@@ -100,7 +106,14 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
 
       <Box
         ref={containerRef}
-        sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minHeight: 48, overflowY: 'auto' }}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          flex: 1,
+          minHeight: DEFAULT_ROW_HEIGHT,
+          overflowY: 'auto',
+        }}
       >
         {rules.isLoading ? (
           <Typography variant="body2" color="text.secondary">
@@ -115,7 +128,21 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
             const category = categoryById.get(rule.categoryId)
             const color = category?.color ?? rule.color ?? uncategorizedColor[scheme]
             return (
-              <Box key={rule.id} data-row="default" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 48, py: 0.5, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}>
+              <Box
+                key={rule.id}
+                data-row="default"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  flex: '1 1 0',
+                  minHeight: DEFAULT_ROW_HEIGHT,
+                  py: 0.5,
+                  px: 1,
+                  borderRadius: 1.5,
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+              >
                 <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
                 <Box sx={{ minWidth: 0, flexGrow: 1 }}>
                   <Typography variant="body2" noWrap title={rule.merchant}>

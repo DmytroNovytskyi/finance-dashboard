@@ -26,6 +26,9 @@ interface CategoryManagerProps {
 
 const EMPTY_COLOR = '#607d8b'
 
+/** Unstretched height of one category row; the rows share whatever height the card has left. */
+const CATEGORY_ROW_HEIGHT = 42
+
 interface EditorState {
   open: boolean
   id?: number
@@ -46,7 +49,10 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const mutationError = (create.error ?? update.error ?? remove.error ?? unlink.error) as Error | null
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(categories.length, { rowSelector: '[data-row]' })
+  const { containerRef, rows: perPage } = useFittingRows(categories.length, {
+    rowSelector: '[data-row]',
+    naturalRowHeight: CATEGORY_ROW_HEIGHT,
+  })
   const maxPage = Math.max(0, Math.ceil(categories.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageCategories = categories.slice(shownPage * perPage, shownPage * perPage + perPage)
@@ -85,13 +91,30 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
 
       <Box
         ref={containerRef}
-        sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minHeight: 44, overflowY: 'auto' }}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          flex: 1,
+          minHeight: CATEGORY_ROW_HEIGHT,
+          overflowY: 'auto',
+        }}
       >
         {pageCategories.map((category) => (
           <Box
             key={category.id}
             data-row="category"
-            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 40, py: 0.5, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              flex: '1 1 0',
+              minHeight: CATEGORY_ROW_HEIGHT,
+              py: 0.5,
+              px: 1,
+              borderRadius: 1.5,
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
           >
             {category.system ? (
               <Box aria-hidden sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: category.color, flexShrink: 0 }} />

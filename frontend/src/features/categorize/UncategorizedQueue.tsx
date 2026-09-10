@@ -30,6 +30,9 @@ interface UncategorizedQueueProps {
   categories: CategoryPresentation[]
 }
 
+/** Unstretched height of one queue row; the rows share whatever height the card has left. */
+const QUEUE_ROW_HEIGHT = 54
+
 function normalizeMerchant(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, ' ')
 }
@@ -59,7 +62,10 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const rows = queue.data?.content ?? []
   const total = queue.data?.totalElements ?? 0
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(rows.length, { rowSelector: '[data-row]' })
+  const { containerRef, rows: perPage } = useFittingRows(rows.length, {
+    rowSelector: '[data-row]',
+    naturalRowHeight: QUEUE_ROW_HEIGHT,
+  })
   const maxPage = Math.max(0, Math.ceil(rows.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageRows = rows.slice(shownPage * perPage, shownPage * perPage + perPage)
@@ -204,7 +210,15 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
 
       <Box
         ref={containerRef}
-        sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minWidth: 0, minHeight: 48, overflowY: 'auto' }}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          flex: 1,
+          minWidth: 0,
+          minHeight: QUEUE_ROW_HEIGHT,
+          overflowY: 'auto',
+        }}
       >
         {queue.isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -219,7 +233,17 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
             <Box
               key={transaction.id}
               data-row="queue"
-              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 48, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                flex: '1 1 0',
+                minHeight: QUEUE_ROW_HEIGHT,
+                py: 0.5,
+                px: 1,
+                borderRadius: 1.5,
+                '&:hover': { bgcolor: 'action.hover' },
+              }}
             >
               <Checkbox size="small" checked={selected.has(transaction.id)} onChange={() => toggle(transaction.id)} aria-label={`Select transaction ${transaction.id}`} />
               <Box sx={{ minWidth: 0, flexGrow: 1 }}>

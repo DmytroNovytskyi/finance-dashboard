@@ -5,6 +5,12 @@ interface FittingRowsOptions {
   rowSelector: string
   /** Optional element inside the container whose height is not available for rows, e.g. a head. */
   reservedSelector?: string
+  /**
+   * The height a row occupies before any stretching. Supply it for lists whose rows grow to fill
+   * the container — measuring those would read back the stretched height and shrink the page on
+   * every pass.
+   */
+  naturalRowHeight?: number
   /** Floor for the count; keep it low, since a floor above what fits reintroduces a scrollbar. */
   min?: number
   max?: number
@@ -22,16 +28,18 @@ interface FittingRows {
  * re-measures whenever the container resizes or the row count changes.
  */
 export function useFittingRows(rowCount: number, options: FittingRowsOptions): FittingRows {
-  const { rowSelector, reservedSelector, min = 1, max = 200 } = options
+  const { rowSelector, reservedSelector, naturalRowHeight, min = 1, max = 200 } = options
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const [rows, setRows] = useState(min)
 
   useEffect(() => {
     if (!container) return
     const measure = () => {
-      let rowHeight = 0
-      for (const row of container.querySelectorAll(rowSelector)) {
-        rowHeight = Math.max(rowHeight, row.getBoundingClientRect().height)
+      let rowHeight = naturalRowHeight ?? 0
+      if (naturalRowHeight === undefined) {
+        for (const row of container.querySelectorAll(rowSelector)) {
+          rowHeight = Math.max(rowHeight, row.getBoundingClientRect().height)
+        }
       }
       if (rowHeight <= 0) return
       const gap = parseFloat(getComputedStyle(container).rowGap) || 0
@@ -45,7 +53,7 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
     const observer = new ResizeObserver(measure)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [container, rowCount, rowSelector, reservedSelector, min, max])
+  }, [container, rowCount, rowSelector, reservedSelector, naturalRowHeight, min, max])
 
   return { containerRef: setContainer, rows }
 }
