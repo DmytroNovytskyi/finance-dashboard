@@ -49,7 +49,9 @@ public class AccountService {
                 .name(name != null ? requireName(name) : current.getName())
                 .currency(currency != null ? requireCurrency(currency) : current.getCurrency())
                 .kind(kind != null ? kind : current.getKind())
-                .accountNumber(accountNumber == null ? null : AccountNumbers.canonical(accountNumber))
+                .accountNumber(accountNumber != null
+                        ? AccountNumbers.canonical(accountNumber)
+                        : current.getAccountNumber())
                 .build();
         return accounts.save(account);
     }

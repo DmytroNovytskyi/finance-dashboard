@@ -68,24 +68,50 @@ class AccountServiceTest {
         assertThatThrownBy(() -> service.get(1L)).isInstanceOf(NotFoundException.class);
     }
 
-    @Test
-    void updateAppliesProvidedFieldsAndKeepsOthers() {
-        Account existing = Account.builder()
+    private static Account storedAccount(String accountNumber) {
+        return Account.builder()
                 .id(1L)
                 .name("Old")
                 .currency("PLN")
-                .accountNumber("x")
+                .accountNumber(accountNumber)
                 .sortOrder(0)
                 .build();
+    }
+
+    private void givenStored(Account existing) {
         when(accounts.findById(1L)).thenReturn(Optional.of(existing));
         when(accounts.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    void updateAppliesProvidedFieldsAndKeepsOthers() {
+        givenStored(storedAccount("123"));
 
         Account updated = service.update(1L, "New", null, AccountKind.BUSINESS, null);
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getCurrency()).isEqualTo("PLN");
         assertThat(updated.getKind()).isEqualTo(AccountKind.BUSINESS);
-        assertThat(updated.getAccountNumber()).isNull();
+        assertThat(updated.getAccountNumber()).isEqualTo("123");
         verify(accounts).save(any());
+    }
+
+    @Test
+    void updateClearsAccountNumberOnlyWhenExplicitlyBlank() {
+        givenStored(storedAccount("123"));
+
+        Account updated = service.update(1L, null, null, null, "");
+
+        assertThat(updated.getAccountNumber()).isNull();
+    }
+
+    @Test
+    void updateCanonicalizesAProvidedAccountNumber() {
+        givenStored(storedAccount("123"));
+
+        Account updated = service.update(1L, null, null, null,
+                "PL 00 0000 0000 0000 0000 0000 0001");
+
+        assertThat(updated.getAccountNumber()).isEqualTo("00000000000000000000000001");
     }
 }
