@@ -67,9 +67,16 @@ interface TransactionTableProps {
 }
 
 /**
+ * The chip's own left padding plus its border. Pulling the chip back by exactly this much puts its
+ * label on the same left edge as the description and counterparty beneath it, which the chip's box
+ * would otherwise sit one inset to the right of.
+ */
+const TAG_INSET_PX = 7
+
+/**
  * The bordered tag that marks a row as part of a detected pair. It is inline-block, and the
- * description below it is a block, so the tag takes a line of its own and its left edge lines up
- * with the description and the counterparty under it.
+ * description below it is a block, so the tag takes a line of its own rather than indenting the
+ * description away from the counterparty under it.
  */
 function PairTag({ label }: { label: string }) {
   return (
@@ -86,6 +93,7 @@ function PairTag({ label }: { label: string }) {
         py: 0,
         lineHeight: 1.2,
         display: 'inline-block',
+        ml: `-${TAG_INSET_PX}px`,
         mb: 0.25,
         whiteSpace: 'nowrap',
       }}
