@@ -192,11 +192,13 @@ export interface TransferPair {
   to: Transaction
 }
 
-/** One detected purchase-and-refund pair (not yet linked). */
+/** One detected reversal: a purchase and the credit or credits that gave it back. */
 export interface RefundSuggestion {
   purchaseTransactionId: number
-  refundTransactionId: number
+  /** One entry for a plain refund, several when an order came back in parts. */
+  refundTransactionIds: number[]
   accountId: number
+  /** The total given back, which always equals the purchase's magnitude. */
   amount: number
   currency: string
   /** The purchase's merchant, for display; null when the imported row carries none. */
@@ -207,9 +209,9 @@ export interface RefundSuggestion {
   reason: 'ANCHORED' | 'AMOUNT'
 }
 
-/** The purchase and the refund of an applied pair. */
+/** The purchase and the credits of an applied reversal. */
 export interface RefundPair {
   refundGroupId: string | null
   purchase: Transaction
-  refund: Transaction
+  refunds: Transaction[]
 }

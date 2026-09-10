@@ -26,7 +26,10 @@ export function TransferSuggestionRow({
   )
 }
 
-/** Text block of one suggested refund: the purchase it reverses, when, and why it was matched. */
+/**
+ * Text block of one suggested refund: the purchase it reverses, when, how many credits gave it
+ * back, and why it was matched.
+ */
 export function RefundSuggestionRow({
   suggestion,
   accounts,
@@ -35,11 +38,13 @@ export function RefundSuggestionRow({
   accounts: Map<number, AccountPresentation>
 }) {
   const accountName = accounts.get(suggestion.accountId)?.name ?? `Account ${suggestion.accountId}`
+  const credits = suggestion.refundTransactionIds.length
   return (
     <>
       <Typography variant="body2" noWrap>
         {formatMoneyMagnitude(suggestion.amount, suggestion.currency)}
         {suggestion.merchant ? ` · ${suggestion.merchant}` : ''}
+        {credits > 1 ? ` · ${credits} credits` : ''}
       </Typography>
       <Typography variant="caption" color="text.secondary">
         {accountName} · bought {formatDate(suggestion.purchaseDate)} · refunded{' '}

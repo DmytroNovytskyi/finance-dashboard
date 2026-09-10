@@ -18,13 +18,15 @@ export interface TxFilters {
   from?: string
   to?: string
   q: string
+  /** An explicit set of rows, set by drilling into a suggested pair; empty means no constraint. */
+  ids?: number[]
 }
 
 export const emptyFilters: TxFilters = { uncategorized: false, q: '' }
 
 const NATURES: TransactionNature[] = ['INCOME', 'EXPENSE', 'TRANSFER', 'REFUND']
 
-/** Initial filters read from the URL (used for overview drill-down links). */
+/** Initial filters read from the URL (used for overview and suggestion drill-down links). */
 export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
   const nature = searchParams.get('nature') as TransactionNature | null
   const natureValue = nature && NATURES.includes(nature) ? nature : undefined
@@ -32,6 +34,7 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
   const categoryId = searchParams.get('categoryId')
   const from = searchParams.get('from')
   const to = searchParams.get('to')
+  const ids = searchParams.getAll('ids').filter((id) => /^\d+$/.test(id)).map(Number)
   return {
     accountId: accountId && /^\d+$/.test(accountId) ? Number(accountId) : undefined,
     categoryId: categoryId && /^\d+$/.test(categoryId) ? Number(categoryId) : undefined,
@@ -40,6 +43,7 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
     from: from ?? undefined,
     to: to ?? undefined,
     q: '',
+    ids: ids.length > 0 ? ids : undefined,
   }
 }
 
@@ -58,6 +62,7 @@ export function toListParams(
     from: filters.from || undefined,
     to: filters.to || undefined,
     q: filters.q || undefined,
+    ids: filters.ids && filters.ids.length > 0 ? filters.ids : undefined,
     ...(sort ? { sort: sort.key, order: sort.dir } : {}),
     page,
     size,
@@ -66,5 +71,6 @@ export function toListParams(
 
 export function hasFilters(filters: TxFilters): boolean {
   return filters.accountId !== undefined || filters.categoryId !== undefined || filters.uncategorized ||
-    filters.nature !== undefined || filters.from !== undefined || filters.to !== undefined || filters.q !== ''
+    filters.nature !== undefined || filters.from !== undefined || filters.to !== undefined ||
+    filters.q !== '' || filters.ids !== undefined
 }

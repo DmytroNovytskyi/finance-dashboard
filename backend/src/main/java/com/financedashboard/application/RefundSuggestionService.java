@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -61,10 +62,13 @@ public class RefundSuggestionService {
 
     private final TransactionRepository transactions;
 
-    /** A detected purchase-and-refund pair. {@code merchant} is the purchase's, for display. */
+    /**
+     * A detected reversal: one purchase and the credit or credits that gave it back.
+     * {@code merchant} is the purchase's, for display.
+     */
     public record SuggestedRefund(
             Long purchaseTransactionId,
-            Long refundTransactionId,
+            List<Long> refundTransactionIds,
             Long accountId,
             BigDecimal amount,
             String currency,
@@ -74,32 +78,47 @@ public class RefundSuggestionService {
             String reason) {
     }
 
+    /** What the bank said the reversed transaction was: which account, in what, when, and with whom. */
+    private record GroupKey(Long accountId, String currency, LocalDate anchorDate, String merchantToken) {
+    }
+
     /** Returns current suggestions, newest refund first. */
     public List<SuggestedRefund> suggest() {
         Map<Long, List<Transaction>> purchasesByAccount = new HashMap<>();
-        List<Transaction> refunds = new ArrayList<>();
+        Map<GroupKey, List<Transaction>> anchored = new LinkedHashMap<>();
+        List<Transaction> unanchored = new ArrayList<>();
         for (Transaction transaction : transactions.findAllStatistical()) {
             if (transaction.getNature() == TransactionNature.INCOME
                     && mentionsReversedPayment(transaction.getDescription())) {
-                refunds.add(transaction);
+                GroupKey key = groupKey(transaction);
+                if (key == null) {
+                    unanchored.add(transaction);
+                } else {
+                    anchored.computeIfAbsent(key, k -> new ArrayList<>()).add(transaction);
+                }
             } else if (transaction.getNature() == TransactionNature.EXPENSE) {
                 purchasesByAccount.computeIfAbsent(transaction.getAccountId(), k -> new ArrayList<>())
                         .add(transaction);
             }
         }
 
+        List<List<Transaction>> groups = new ArrayList<>(anchored.values());
+        for (Transaction refund : unanchored) {
+            groups.add(List.of(refund));
+        }
+
         List<SuggestedRefund> suggestions = new ArrayList<>();
         Set<Long> used = new HashSet<>();
-        for (Transaction refund : refunds) {
-            if (used.contains(refund.getId())) {
+        for (List<Transaction> group : groups) {
+            if (group.stream().anyMatch(refund -> used.contains(refund.getId()))) {
                 continue;
             }
-            SuggestedRefund best = bestMatch(refund,
-                    purchasesByAccount.getOrDefault(refund.getAccountId(), List.of()), used);
+            SuggestedRefund best = bestMatch(group,
+                    purchasesByAccount.getOrDefault(group.get(0).getAccountId(), List.of()), used);
             if (best != null) {
                 suggestions.add(best);
                 used.add(best.purchaseTransactionId());
-                used.add(best.refundTransactionId());
+                used.addAll(best.refundTransactionIds());
             }
         }
         suggestions.sort(Comparator.comparing(SuggestedRefund::refundDate).reversed());
@@ -119,29 +138,45 @@ public class RefundSuggestionService {
 
     private static boolean pairQuietly(TransactionEditService refunds, SuggestedRefund suggestion) {
         try {
-            refunds.pairRefund(suggestion.purchaseTransactionId(), suggestion.refundTransactionId());
+            refunds.pairRefund(suggestion.purchaseTransactionId(), suggestion.refundTransactionIds());
             return true;
         } catch (IllegalArgumentException | NotFoundException alreadyPairedOrGone) {
             return false;
         }
     }
 
-    private static SuggestedRefund bestMatch(Transaction refund, List<Transaction> purchases, Set<Long> used) {
-        LocalDate anchorDate = parseAnchorDate(refund.getDescription());
-        String anchorMerchant = parseAnchorMerchant(refund.getDescription());
-        BigDecimal magnitude = refund.getAmount().abs();
+    /**
+     * Finds the purchase a group of refunds reverses. The group's credits must add up to it exactly,
+     * which is what rules out a reversal that was only imported in part: half of a refund is not a
+     * refund, and netting a partial one out would erase spending that really happened.
+     */
+    private static SuggestedRefund bestMatch(List<Transaction> group, List<Transaction> purchases, Set<Long> used) {
+        BigDecimal total = group.stream()
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDate firstRefundDate = group.stream()
+                .map(Transaction::getTransactionDate)
+                .min(Comparator.naturalOrder())
+                .orElseThrow();
+        LocalDate lastRefundDate = group.stream()
+                .map(Transaction::getTransactionDate)
+                .max(Comparator.naturalOrder())
+                .orElseThrow();
+        LocalDate anchorDate = parseAnchorDate(group.get(0).getDescription());
+        String anchorMerchant = parseAnchorMerchant(group.get(0).getDescription());
 
         Transaction bestPurchase = null;
         int bestScore = -1;
         long bestGap = Long.MAX_VALUE;
         for (Transaction purchase : purchases) {
             if (used.contains(purchase.getId())
-                    || !purchase.getCurrency().equals(refund.getCurrency())
-                    || purchase.getAmount().abs().compareTo(magnitude) != 0
-                    || purchase.getTransactionDate().isAfter(refund.getTransactionDate())) {
+                    || isDecided(purchase, group)
+                    || !purchase.getCurrency().equals(group.get(0).getCurrency())
+                    || purchase.getAmount().abs().compareTo(total) != 0
+                    || purchase.getTransactionDate().isAfter(firstRefundDate)) {
                 continue;
             }
-            long gap = ChronoUnit.DAYS.between(purchase.getTransactionDate(), refund.getTransactionDate());
+            long gap = ChronoUnit.DAYS.between(purchase.getTransactionDate(), lastRefundDate);
             if (gap > MAX_AGE_DAYS) {
                 continue;
             }
@@ -157,14 +192,38 @@ public class RefundSuggestionService {
         }
         return new SuggestedRefund(
                 bestPurchase.getId(),
-                refund.getId(),
-                refund.getAccountId(),
-                magnitude,
-                refund.getCurrency(),
+                group.stream().map(Transaction::getId).toList(),
+                group.get(0).getAccountId(),
+                total.abs(),
+                group.get(0).getCurrency(),
                 collapsed(bestPurchase.getMerchant()),
                 bestPurchase.getTransactionDate(),
-                refund.getTransactionDate(),
+                lastRefundDate,
                 bestScore > 0 ? "ANCHORED" : "AMOUNT");
+    }
+
+    /**
+     * Whether the user has already decided about this reversal by categorizing every leg of it,
+     * which is how a transfer stops being suggested. One categorized leg is not a decision: a
+     * merchant rule may have set it, and the pair is still mis-stated in the statistics.
+     */
+    private static boolean isDecided(Transaction purchase, List<Transaction> group) {
+        return purchase.getCategoryId() != null
+                && group.stream().allMatch(refund -> refund.getCategoryId() != null);
+    }
+
+    /**
+     * The group a refund belongs to: the credits that all name the same reversed transaction. A
+     * refund that does not name one — no date, or no merchant — stands alone rather than being
+     * bundled with whatever else came in that day.
+     */
+    private static GroupKey groupKey(Transaction refund) {
+        LocalDate anchorDate = parseAnchorDate(refund.getDescription());
+        String anchorMerchant = parseAnchorMerchant(refund.getDescription());
+        if (anchorDate == null || anchorMerchant == null) {
+            return null;
+        }
+        return new GroupKey(refund.getAccountId(), refund.getCurrency(), anchorDate, anchorMerchant);
     }
 
     private static int score(Transaction purchase, LocalDate anchorDate, String anchorMerchant) {

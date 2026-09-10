@@ -48,7 +48,7 @@ class RefundSuggestionServiceTest {
 
         assertThat(suggestions).hasSize(1);
         assertThat(suggestions.get(0).purchaseTransactionId()).isEqualTo(1L);
-        assertThat(suggestions.get(0).refundTransactionId()).isEqualTo(2L);
+        assertThat(suggestions.get(0).refundTransactionIds().get(0)).isEqualTo(2L);
         assertThat(suggestions.get(0).accountId()).isEqualTo(1L);
         assertThat(suggestions.get(0).amount()).isEqualByComparingTo("12.34");
         assertThat(suggestions.get(0).merchant()).isEqualTo("EXAMPLE SHOP \\Somewhere XX");
@@ -137,6 +137,105 @@ class RefundSuggestionServiceTest {
     }
 
     @Test
+    void ignoresAPairWhoseBothLegsAreCategorized() {
+        Transaction purchase = expense(1L, 1L, "-50.00", "2026-06-01", "SOME SHOP", null)
+                .toBuilder().categoryId(3L).build();
+        Transaction refund = income(2L, 1L, "50.00", "2026-06-01", REVERSAL + "Nr ref.: 1")
+                .toBuilder().categoryId(4L).build();
+        when(transactions.findAllStatistical()).thenReturn(List.of(purchase, refund));
+
+        assertThat(service.suggest()).isEmpty();
+    }
+
+    @Test
+    void stillSuggestsWhenOnlyTheRefundLegIsCategorized() {
+        Transaction purchase = expense(1L, 1L, "-50.00", "2026-06-01", "SOME SHOP", null);
+        Transaction refund = income(2L, 1L, "50.00", "2026-06-01", REVERSAL + "Nr ref.: 1")
+                .toBuilder().categoryId(4L).build();
+        when(transactions.findAllStatistical()).thenReturn(List.of(purchase, refund));
+
+        assertThat(service.suggest()).hasSize(1);
+    }
+
+    @Test
+    void stillSuggestsWhenOnlyThePurchaseLegIsCategorized() {
+        Transaction purchase = expense(1L, 1L, "-50.00", "2026-06-01", "SOME SHOP", null)
+                .toBuilder().categoryId(3L).build();
+        Transaction refund = income(2L, 1L, "50.00", "2026-06-01", REVERSAL + "Nr ref.: 1");
+        when(transactions.findAllStatistical()).thenReturn(List.of(purchase, refund));
+
+        assertThat(service.suggest()).hasSize(1);
+    }
+
+    @Test
+    void matchesOnePurchaseAgainstTheCreditsThatAddUpToIt() {
+        Transaction purchase = expense(1L, 1L, "-61.46", "2026-05-20", "example store Luxembourg", null);
+        Transaction first = income(2L, 1L, "14.45", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        Transaction second = income(3L, 1L, "23.27", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        Transaction third = income(4L, 1L, "23.74", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        when(transactions.findAllStatistical()).thenReturn(List.of(purchase, first, second, third));
+
+        List<SuggestedRefund> suggestions = service.suggest();
+
+        assertThat(suggestions).hasSize(1);
+        assertThat(suggestions.get(0).purchaseTransactionId()).isEqualTo(1L);
+        assertThat(suggestions.get(0).refundTransactionIds()).containsExactly(2L, 3L, 4L);
+        assertThat(suggestions.get(0).amount()).isEqualByComparingTo("61.46");
+        assertThat(suggestions.get(0).reason()).isEqualTo("ANCHORED");
+    }
+
+    @Test
+    void ignoresCreditsThatDoNotAddUpToThePurchase() {
+        Transaction purchase = expense(1L, 1L, "-61.46", "2026-05-20", "example store Luxembourg", null);
+        Transaction first = income(2L, 1L, "14.45", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        Transaction second = income(3L, 1L, "23.27", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        when(transactions.findAllStatistical()).thenReturn(List.of(purchase, first, second));
+
+        assertThat(service.suggest()).isEmpty();
+    }
+
+    @Test
+    void keepsCreditsOfDifferentPurchasesApart() {
+        Transaction firstPurchase = expense(1L, 1L, "-20.00", "2026-05-20", "Alpha Store", null);
+        Transaction secondPurchase = expense(2L, 1L, "-30.00", "2026-05-20", "Bravo Store", null);
+        Transaction firstCredit = income(3L, 1L, "20.00", "2026-05-20",
+                CANCELLATION + "alpha-store \\Somewhere    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        Transaction secondCredit = income(4L, 1L, "30.00", "2026-05-20",
+                CANCELLATION + "bravo-store \\Somewhere    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI");
+        when(transactions.findAllStatistical())
+                .thenReturn(List.of(firstPurchase, secondPurchase, firstCredit, secondCredit));
+
+        List<SuggestedRefund> suggestions = service.suggest();
+
+        assertThat(suggestions).hasSize(2);
+        assertThat(suggestions).allSatisfy(suggestion ->
+                assertThat(suggestion.refundTransactionIds()).hasSize(1));
+    }
+
+    @Test
+    void ignoresAGroupWhoseEveryLegIsCategorized() {
+        Transaction purchase = expense(1L, 1L, "-61.46", "2026-05-20", "example store Luxembourg", null)
+                .toBuilder().categoryId(3L).build();
+        Transaction first = income(2L, 1L, "14.45", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI")
+                .toBuilder().categoryId(4L).build();
+        Transaction second = income(3L, 1L, "23.27", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI")
+                .toBuilder().categoryId(4L).build();
+        Transaction third = income(4L, 1L, "23.74", "2026-05-20",
+                CANCELLATION + "example store \\Luxembourg    DN. 20/05/2026 KRAJ WYKONANIA OPERACJI")
+                .toBuilder().categoryId(4L).build();
+        when(transactions.findAllStatistical()).thenReturn(List.of(purchase, first, second, third));
+
+        assertThat(service.suggest()).isEmpty();
+    }
+
+    @Test
     void spendsEachPurchaseOnASingleRefund() {
         Transaction purchase = expense(1L, 1L, "-50.00", "2026-06-01", "SOME SHOP", null);
         Transaction first = income(2L, 1L, "50.00", "2026-06-01", REVERSAL + "Nr ref.: 1");
@@ -146,7 +245,7 @@ class RefundSuggestionServiceTest {
         List<SuggestedRefund> suggestions = service.suggest();
 
         assertThat(suggestions).hasSize(1);
-        assertThat(suggestions.get(0).refundTransactionId()).isEqualTo(2L);
+        assertThat(suggestions.get(0).refundTransactionIds().get(0)).isEqualTo(2L);
     }
 
     @Test
@@ -157,11 +256,11 @@ class RefundSuggestionServiceTest {
         Transaction secondRefund = income(4L, 1L, "70.00", "2026-06-01", "ZA ZWROT TRANSAKCJI Nr ref.: 2");
         when(transactions.findAllStatistical())
                 .thenReturn(List.of(firstPurchase, secondPurchase, firstRefund, secondRefund));
-        when(edit.pairRefund(1L, 3L)).thenThrow(new IllegalArgumentException("already paired"));
-        when(edit.pairRefund(2L, 4L)).thenReturn(List.of());
+        when(edit.pairRefund(1L, List.of(3L))).thenThrow(new IllegalArgumentException("already paired"));
+        when(edit.pairRefund(2L, List.of(4L))).thenReturn(List.of());
 
         assertThat(service.apply(edit)).isEqualTo(1);
-        verify(edit).pairRefund(2L, 4L);
+        verify(edit).pairRefund(2L, List.of(4L));
     }
 
     private static Transaction expense(long id, long accountId, String amount, String date,

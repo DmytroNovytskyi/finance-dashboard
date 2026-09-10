@@ -93,7 +93,7 @@ One imported file, attributed to exactly one account.
 | category_id | bigint FK → category, null | null = uncategorized |
 | dedup_hash | varchar | (date, amount, currency, description) — idempotent import |
 | transfer_group_id | uuid null | shared by the two legs of an internal transfer |
-| refund_group_id | uuid null | shared by the purchase and the refund that reverses it |
+| refund_group_id | uuid null | shared by a purchase and every credit that reverses it (an order can come back in parts) |
 | created_at | timestamptz | |
 
 `EXPENSE` and `INCOME` participate in statistics; `TRANSFER` rows (money moved between the

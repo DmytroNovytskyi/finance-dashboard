@@ -32,7 +32,7 @@ class RefundApiTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].purchaseTransactionId").value(purchaseId))
-                .andExpect(jsonPath("$[0].refundTransactionId").value(refundId))
+                .andExpect(jsonPath("$[0].refundTransactionIds[0]").value(refundId))
                 .andExpect(jsonPath("$[0].amount").value(12.34))
                 .andExpect(jsonPath("$[0].reason").value("ANCHORED"));
 
@@ -58,6 +58,64 @@ class RefundApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void linksAPurchaseReversedBySeveralCreditsAndUnlinksAllOfThem() throws Exception {
+        long categoryId = insertReservedCategory();
+        long accountId = insertAccount();
+        long statementId = insertStatement(accountId);
+        long purchaseId = insertTransaction(statementId, accountId, "-61.46", "EXPENSE",
+                "TRANSAKCJA KARTĄ PŁATNICZĄ example-shop Somewhere", "example-shop");
+        long firstId = insertTransaction(statementId, accountId, "14.45", "INCOME", REVERSAL, null);
+        long secondId = insertTransaction(statementId, accountId, "23.27", "INCOME", REVERSAL, null);
+        long thirdId = insertTransaction(statementId, accountId, "23.74", "INCOME", REVERSAL, null);
+
+        mockMvc.perform(get("/api/v1/refunds/suggestions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].purchaseTransactionId").value(purchaseId))
+                .andExpect(jsonPath("$[0].refundTransactionIds.length()").value(3))
+                .andExpect(jsonPath("$[0].amount").value(61.46))
+                .andExpect(jsonPath("$[0].reason").value("ANCHORED"));
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchaseTransactionId\":" + purchaseId
+                                + ",\"refundTransactionIds\":[" + firstId + "," + secondId + ","
+                                + thirdId + "]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.refunds.length()").value(3))
+                .andExpect(jsonPath("$.purchase.nature").value("REFUND"));
+
+        for (long id : new long[] {purchaseId, firstId, secondId, thirdId}) {
+            assertThat(natureOf(id)).isEqualTo("REFUND");
+            assertThat(categoryOf(id)).isEqualTo(categoryId);
+        }
+
+        mockMvc.perform(post("/api/v1/refunds/" + secondId + "/unlink"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(4));
+
+        assertThat(natureOf(purchaseId)).isEqualTo("EXPENSE");
+        assertThat(natureOf(firstId)).isEqualTo("INCOME");
+        assertThat(categoryOf(thirdId)).isNull();
+    }
+
+    @Test
+    void rejectsCreditsThatDoNotAddUpToThePurchase() throws Exception {
+        insertReservedCategory();
+        long accountId = insertAccount();
+        long statementId = insertStatement(accountId);
+        long purchaseId = insertTransaction(statementId, accountId, "-61.46", "EXPENSE", "SOME SHOP", null);
+        long firstId = insertTransaction(statementId, accountId, "14.45", "INCOME", "ZWROT TRANSAKCJI", null);
+        long secondId = insertTransaction(statementId, accountId, "23.27", "INCOME", "ZWROT TRANSAKCJI", null);
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchaseTransactionId\":" + purchaseId
+                                + ",\"refundTransactionIds\":[" + firstId + "," + secondId + "]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void linksAPairChosenByHand() throws Exception {
         insertReservedCategory();
         long accountId = insertAccount();
@@ -68,11 +126,11 @@ class RefundApiTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/refunds")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"purchaseTransactionId\":" + purchaseId
-                                + ",\"refundTransactionId\":" + refundId + "}"))
+                                + ",\"refundTransactionIds\":[" + refundId + "]}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.refundGroupId").isNotEmpty())
                 .andExpect(jsonPath("$.purchase.nature").value("REFUND"))
-                .andExpect(jsonPath("$.refund.nature").value("REFUND"));
+                .andExpect(jsonPath("$.refunds[0].nature").value("REFUND"));
 
         assertThat(refundGroupOf(purchaseId)).isEqualTo(refundGroupOf(refundId)).isNotNull();
     }
@@ -88,7 +146,7 @@ class RefundApiTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/refunds")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"purchaseTransactionId\":" + purchaseId
-                                + ",\"refundTransactionId\":" + refundId + "}"))
+                                + ",\"refundTransactionIds\":[" + refundId + "]}"))
                 .andExpect(status().isBadRequest());
     }
 

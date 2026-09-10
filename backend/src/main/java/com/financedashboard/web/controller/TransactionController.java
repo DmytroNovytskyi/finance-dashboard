@@ -47,13 +47,14 @@ public class TransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) List<Long> ids,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String order,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
 
         TransactionFilter filter = new TransactionFilter(
-                accountId, categoryId, uncategorized, nature, from, to, q);
+                accountId, categoryId, uncategorized, nature, from, to, q, ids);
         PagedTransactions result = transactions.list(filter, page, size, toOrder(sort, order));
         List<TransactionResponse> content = result.content().stream()
                 .map(TransactionResponse::from)

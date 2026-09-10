@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -15,6 +15,7 @@ import {
   useTransferSuggestions,
 } from '../../api/queries'
 import { refundsApi, transactionsApi, transfersApi } from '../../api/endpoints'
+import { buildQuery } from '../../api/client'
 import { queryKeys } from '../../api/keys'
 import type { AccountPresentation } from '../../api/queries'
 import type { RefundSuggestion, TransferSuggestion } from '../../types'
@@ -41,6 +42,7 @@ const FULL_LIST_SIZE = 10_000
 /** Transactions list with filters, overview drill-down, and delete-by-range. */
 export function TransactionsPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [filters, setFilters] = useState<TxFilters>(() => filtersFromUrl(searchParams))
   const [sort, setSort] = useState<TransactionSort>(DEFAULT_TRANSACTION_SORT)
@@ -52,6 +54,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     setFilters(filtersFromUrl(searchParams))
+    setPage(0)
   }, [searchParams])
 
   useEffect(() => {
@@ -115,7 +118,9 @@ export function TransactionsPage() {
     const ids = new Set<number>()
     for (const suggestion of refundSuggestionsQuery.data ?? []) {
       ids.add(suggestion.purchaseTransactionId)
-      ids.add(suggestion.refundTransactionId)
+      for (const refundId of suggestion.refundTransactionIds) {
+        ids.add(refundId)
+      }
     }
     return ids
   }, [refundSuggestionsQuery.data])
@@ -131,7 +136,7 @@ export function TransactionsPage() {
   })
   const applyRefundMutation = useMutation({
     mutationFn: (suggestion: RefundSuggestion) =>
-      refundsApi.pair(suggestion.purchaseTransactionId, suggestion.refundTransactionId),
+      refundsApi.pair(suggestion.purchaseTransactionId, suggestion.refundTransactionIds),
     onSuccess: invalidateAfterRefundAction,
   })
   const unlinkRefundMutation = useMutation({
@@ -140,6 +145,8 @@ export function TransactionsPage() {
   })
 
   const changeCategory = (id: number, categoryId: number | null) => categorizeOne.mutate({ id, categoryId })
+
+  const showRows = (ids: number[]) => navigate(`/transactions${buildQuery({ ids })}`)
 
   const applyFilters = (next: TxFilters) => {
     setFilters(next)
@@ -194,6 +201,9 @@ export function TransactionsPage() {
           )}
           onApplyAll={() => applyAllMutation.mutate()}
           onApply={(suggestion) => applyOneMutation.mutate(suggestion)}
+          onSelect={(suggestion) =>
+            showRows([suggestion.fromTransactionId, suggestion.toTransactionId])
+          }
         />
       ) : null}
 
@@ -205,12 +215,15 @@ export function TransactionsPage() {
           } that came back. Linking both legs takes them out of your spending and income.`}
           suggestions={refundSuggestionsQuery.data ?? []}
           busy={applyAllRefundsMutation.isPending || applyRefundMutation.isPending}
-          rowKey={(suggestion) => `${suggestion.purchaseTransactionId}-${suggestion.refundTransactionId}`}
+          rowKey={(suggestion) => `${suggestion.purchaseTransactionId}-${suggestion.refundTransactionIds.join('.')}`}
           renderRow={(suggestion) => (
             <RefundSuggestionRow suggestion={suggestion} accounts={accountsById} />
           )}
           onApplyAll={() => applyAllRefundsMutation.mutate()}
           onApply={(suggestion) => applyRefundMutation.mutate(suggestion)}
+          onSelect={(suggestion) =>
+            showRows([suggestion.purchaseTransactionId, ...suggestion.refundTransactionIds])
+          }
         />
       ) : null}
 

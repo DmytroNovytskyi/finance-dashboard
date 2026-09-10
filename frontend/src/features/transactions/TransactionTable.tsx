@@ -206,7 +206,7 @@ export function TransactionTable({
   return (
     <Paper
       variant="outlined"
-      sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 180 }}
+      sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 140 }}
     >
       <TableContainer sx={{ flex: 1, minHeight: 0 }}>
         <Table size="small" stickyHeader sx={{ minWidth: 860 }}>

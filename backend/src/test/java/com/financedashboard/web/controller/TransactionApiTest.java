@@ -107,6 +107,32 @@ class TransactionApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void listsOnlyTheGivenIds() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions")
+                        .param("ids", String.valueOf(txA))
+                        .param("ids", String.valueOf(txD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].id").value(txD))
+                .andExpect(jsonPath("$.content[1].id").value(txA));
+
+        mockMvc.perform(get("/api/v1/transactions").param("ids", "9999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void combinesTheIdFilterWithTheOtherFilters() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions")
+                        .param("ids", String.valueOf(txA))
+                        .param("ids", String.valueOf(txB))
+                        .param("categoryId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(txB));
+    }
+
+    @Test
     void searchesByDescriptionAndMerchant() throws Exception {
         mockMvc.perform(get("/api/v1/transactions").param("q", "pizza"))
                 .andExpect(status().isOk())

@@ -353,7 +353,7 @@ class TransactionEditServiceTest {
                 .thenReturn(Optional.of(Category.builder().id(9L).name("Refund").build()));
         when(transactions.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var legs = service.pairRefund(1L, 2L);
+        var legs = service.pairRefund(1L, List.of(2L));
 
         assertThat(legs).allSatisfy(leg -> {
             assertThat(leg.getNature()).isEqualTo(TransactionNature.REFUND);
@@ -363,13 +363,68 @@ class TransactionEditServiceTest {
     }
 
     @Test
+    void pairRefundGroupsOnePurchaseWithSeveralCredits() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-61.46"), TransactionNature.EXPENSE);
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(
+                transaction(2L, 1L, new BigDecimal("14.45"), TransactionNature.INCOME)));
+        when(transactions.findById(3L)).thenReturn(Optional.of(
+                transaction(3L, 1L, new BigDecimal("23.27"), TransactionNature.INCOME)));
+        when(transactions.findById(4L)).thenReturn(Optional.of(
+                transaction(4L, 1L, new BigDecimal("23.74"), TransactionNature.INCOME)));
+        when(categories.findSystemCategory("REFUND"))
+                .thenReturn(Optional.of(Category.builder().id(9L).name("Refund").build()));
+        when(transactions.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var legs = service.pairRefund(1L, List.of(2L, 3L, 4L));
+
+        assertThat(legs).hasSize(4);
+        assertThat(legs).allSatisfy(leg -> {
+            assertThat(leg.getNature()).isEqualTo(TransactionNature.REFUND);
+            assertThat(leg.getCategoryId()).isEqualTo(9L);
+        });
+        assertThat(legs.get(0).getId()).isEqualTo(1L);
+        assertThat(legs.stream().map(Transaction::getRefundGroupId).distinct()).hasSize(1);
+    }
+
+    @Test
+    void pairRefundRejectsCreditsThatDoNotAddUpToThePurchase() {
+        Transaction purchase = transaction(1L, 1L, new BigDecimal("-61.46"), TransactionNature.EXPENSE);
+        Transaction first = transaction(2L, 1L, new BigDecimal("14.45"), TransactionNature.INCOME);
+        Transaction second = transaction(3L, 1L, new BigDecimal("23.27"), TransactionNature.INCOME);
+        when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
+        when(transactions.findById(2L)).thenReturn(Optional.of(first));
+        when(transactions.findById(3L)).thenReturn(Optional.of(second));
+
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of(2L, 3L)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(transactions, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void pairRefundRejectsAnEmptyCreditList() {
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(transactions, org.mockito.Mockito.never()).findById(any());
+    }
+
+    @Test
+    void pairRefundRejectsAPurchaseThatCameIn() {
+        Transaction incoming = transaction(1L, 1L, new BigDecimal("17.80"), TransactionNature.INCOME);
+        when(transactions.findById(1L)).thenReturn(Optional.of(incoming));
+
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of(2L)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void pairRefundRejectsLegsInDifferentAccounts() {
         Transaction purchase = transaction(1L, 1L, new BigDecimal("-17.80"), TransactionNature.EXPENSE);
         Transaction refund = transaction(2L, 2L, new BigDecimal("17.80"), TransactionNature.INCOME);
         when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
         when(transactions.findById(2L)).thenReturn(Optional.of(refund));
 
-        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of(2L)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -380,7 +435,7 @@ class TransactionEditServiceTest {
         when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
         when(transactions.findById(2L)).thenReturn(Optional.of(other));
 
-        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of(2L)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -391,7 +446,7 @@ class TransactionEditServiceTest {
         when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
         when(transactions.findById(2L)).thenReturn(Optional.of(partial));
 
-        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of(2L)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -403,7 +458,7 @@ class TransactionEditServiceTest {
         when(transactions.findById(1L)).thenReturn(Optional.of(purchase));
         when(transactions.findById(2L)).thenReturn(Optional.of(refund));
 
-        assertThatThrownBy(() -> service.pairRefund(1L, 2L))
+        assertThatThrownBy(() -> service.pairRefund(1L, List.of(2L)))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(transactions, org.mockito.Mockito.never()).save(any());
     }

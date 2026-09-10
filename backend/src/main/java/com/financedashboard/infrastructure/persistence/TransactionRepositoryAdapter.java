@@ -211,6 +211,9 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     private static Specification<TransactionEntity> toSpecification(TransactionFilter filter) {
         return (Root<TransactionEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            if (filter.ids() != null && !filter.ids().isEmpty()) {
+                predicates.add(root.get("id").in(filter.ids()));
+            }
             if (filter.accountId() != null) {
                 predicates.add(cb.equal(root.get("accountId"), filter.accountId()));
             }

@@ -27,6 +27,8 @@ export interface TransactionListParams {
   from?: string
   to?: string
   q?: string
+  /** Repeated `ids` query params; restricts the list to an explicit set of rows. */
+  ids?: number[]
   sort?: TransactionSortKey
   order?: 'asc' | 'desc'
   page?: number
@@ -157,15 +159,15 @@ export const transfersApi = {
 export const refundsApi = {
   /** Detected purchase-and-refund pairs that are not linked yet. */
   suggestions: () => request<RefundSuggestion[]>('/refunds/suggestions'),
-  /** Links one purchase with its refund. */
-  pair: (purchaseTransactionId: number, refundTransactionId: number) =>
+  /** Links a purchase with the one or more credits that reverse it. */
+  pair: (purchaseTransactionId: number, refundTransactionIds: number[]) =>
     request<RefundPair>('/refunds', {
       method: 'POST',
-      body: JSON.stringify({ purchaseTransactionId, refundTransactionId }),
+      body: JSON.stringify({ purchaseTransactionId, refundTransactionIds }),
     }),
   /** Links every current suggestion. */
   applyAll: () => request<{ applied: number }>('/refunds/suggestions/apply', { method: 'POST' }),
-  /** Reverts a linked pair back to its natural income/expense legs. */
+  /** Reverts a linked reversal back to its natural income/expense legs. */
   unlink: (transactionId: number) =>
     request<{ count: number }>(`/refunds/${transactionId}/unlink`, { method: 'POST' }),
 }

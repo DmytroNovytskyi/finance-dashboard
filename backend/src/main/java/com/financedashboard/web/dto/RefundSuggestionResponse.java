@@ -3,11 +3,12 @@ package com.financedashboard.web.dto;
 import com.financedashboard.application.RefundSuggestionService.SuggestedRefund;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
-/** API representation of a suggested purchase-and-refund pair. */
+/** API representation of a suggested reversal: one purchase and the credits that gave it back. */
 public record RefundSuggestionResponse(
         Long purchaseTransactionId,
-        Long refundTransactionId,
+        List<Long> refundTransactionIds,
         Long accountId,
         BigDecimal amount,
         String currency,
@@ -19,7 +20,7 @@ public record RefundSuggestionResponse(
     public static RefundSuggestionResponse from(SuggestedRefund suggestion) {
         return new RefundSuggestionResponse(
                 suggestion.purchaseTransactionId(),
-                suggestion.refundTransactionId(),
+                suggestion.refundTransactionIds(),
                 suggestion.accountId(),
                 suggestion.amount(),
                 suggestion.currency(),

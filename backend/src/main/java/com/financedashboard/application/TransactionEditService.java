@@ -9,7 +9,9 @@ import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionNature;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -178,36 +180,60 @@ public class TransactionEditService {
     }
 
     /**
-     * Pairs a purchase with its refund: both legs become {@code REFUND} and take the reserved Refund
-     * category, so neither counts towards statistics. The legs must belong to the same account,
-     * carry opposite signs and have an equal magnitude — netting out a partial refund would erase
-     * spending that really happened. Returns the two stored legs.
+     * Pairs a purchase with the refund that reverses it: every leg becomes {@code REFUND} and takes
+     * the reserved Refund category, so none of them counts towards statistics. One purchase may be
+     * reversed by several credits — an order refunded in parts — so the call takes a list. The
+     * purchase must be outgoing and the refunds incoming, all in the same account and currency, and
+     * the credits must add up to the purchase exactly: netting out a partial refund would erase
+     * spending that really happened. Returns the stored legs, the purchase first.
      */
     @Transactional
-    public List<Transaction> pairRefund(Long firstId, Long secondId) {
-        Transaction first = get(firstId);
-        Transaction second = get(secondId);
-        if (!Objects.equals(first.getAccountId(), second.getAccountId())) {
-            throw new IllegalArgumentException("Refund legs must belong to the same account");
+    public List<Transaction> pairRefund(Long purchaseId, List<Long> refundIds) {
+        if (refundIds.isEmpty()) {
+            throw new IllegalArgumentException("A refund needs at least one incoming leg");
         }
-        if (first.getAmount().signum() == second.getAmount().signum()) {
-            throw new IllegalArgumentException("Refund legs must have opposite signs");
+        if (refundIds.contains(purchaseId)) {
+            throw new IllegalArgumentException("A transaction cannot be on both sides of a refund");
         }
-        if (first.getAmount().abs().compareTo(second.getAmount().abs()) != 0) {
-            throw new IllegalArgumentException("Refund legs must have the same magnitude");
+        Transaction purchase = get(purchaseId);
+        if (purchase.getAmount().signum() >= 0) {
+            throw new IllegalArgumentException("The purchase must be an outgoing amount");
         }
-        if (isPaired(first) || isPaired(second)) {
+        if (isPaired(purchase)) {
             throw new IllegalArgumentException("One of the transactions is already paired");
+        }
+        List<Transaction> refunds = refundIds.stream().map(this::get).toList();
+        BigDecimal refunded = BigDecimal.ZERO;
+        for (Transaction refund : refunds) {
+            if (refund.getAmount().signum() <= 0) {
+                throw new IllegalArgumentException("Every refund leg must be an incoming amount");
+            }
+            if (!Objects.equals(purchase.getAccountId(), refund.getAccountId())) {
+                throw new IllegalArgumentException("Refund legs must belong to the same account");
+            }
+            if (!purchase.getCurrency().equals(refund.getCurrency())) {
+                throw new IllegalArgumentException("Refund legs must share the purchase's currency");
+            }
+            if (isPaired(refund)) {
+                throw new IllegalArgumentException("One of the transactions is already paired");
+            }
+            refunded = refunded.add(refund.getAmount());
+        }
+        if (purchase.getAmount().abs().compareTo(refunded) != 0) {
+            throw new IllegalArgumentException("The refunds must add up to the purchase exactly");
         }
         UUID group = UUID.randomUUID();
         Long refundCategory = refundCategoryId();
-        Transaction firstLeg = transactions.save(first.toBuilder()
+        List<Transaction> legs = new ArrayList<>();
+        legs.add(transactions.save(purchase.toBuilder()
                 .nature(TransactionNature.REFUND).refundGroupId(group)
-                .categoryId(refundCategory).build());
-        Transaction secondLeg = transactions.save(second.toBuilder()
-                .nature(TransactionNature.REFUND).refundGroupId(group)
-                .categoryId(refundCategory).build());
-        return List.of(firstLeg, secondLeg);
+                .categoryId(refundCategory).build()));
+        for (Transaction refund : refunds) {
+            legs.add(transactions.save(refund.toBuilder()
+                    .nature(TransactionNature.REFUND).refundGroupId(group)
+                    .categoryId(refundCategory).build()));
+        }
+        return legs;
     }
 
     /**

@@ -34,11 +34,14 @@ public class RefundController {
     @ResponseStatus(HttpStatus.CREATED)
     public RefundPairResponse pair(@Valid @RequestBody PairRefundRequest request) {
         List<Transaction> legs = refunds.pairRefund(
-                request.purchaseTransactionId(), request.refundTransactionId());
+                request.purchaseTransactionId(), request.refundTransactionIds());
+        List<TransactionResponse> credits = legs.subList(1, legs.size()).stream()
+                .map(TransactionResponse::from)
+                .toList();
         return new RefundPairResponse(
                 legs.get(0).getRefundGroupId(),
                 TransactionResponse.from(legs.get(0)),
-                TransactionResponse.from(legs.get(1)));
+                credits);
     }
 
     /** Lists currently detected purchase-and-refund pairs that are not yet linked. */

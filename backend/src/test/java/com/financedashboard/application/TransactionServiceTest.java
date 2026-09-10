@@ -29,7 +29,7 @@ class TransactionServiceTest {
     private TransactionService service;
 
     private static final TransactionFilter NO_FILTER =
-            new TransactionFilter(null, null, null, null, null, null, null);
+            new TransactionFilter(null, null, null, null, null, null, null, null);
     private static final TransactionOrder DEFAULT_ORDER =
             new TransactionOrder(TransactionSortField.DATE, false);
 

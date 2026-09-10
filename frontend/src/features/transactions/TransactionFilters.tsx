@@ -2,6 +2,7 @@ import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
 import type { AccountPresentation, CategoryPresentation } from '../../api/queries'
 import type { TransactionNature } from '../../types'
 import { hasFilters, type TxFilters } from './model'
@@ -96,6 +97,11 @@ export function TransactionFilters({ filters, accounts, categories, onChange, on
         onChange={(event) => patch({ to: event.target.value || undefined })}
         slotProps={{ inputLabel: { shrink: true } }}
       />
+      {filters.ids && filters.ids.length > 0 ? (
+        <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+          Showing the {filters.ids.length} transactions of one suggestion
+        </Typography>
+      ) : null}
       {hasFilters(filters) ? (
         <Button size="small" onClick={onClear}>
           Clear

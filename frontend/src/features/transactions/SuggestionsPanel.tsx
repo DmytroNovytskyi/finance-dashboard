@@ -1,8 +1,24 @@
+import { useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
+import TablePagination from '@mui/material/TablePagination'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
+import { useFittingRows } from '../../hooks/useFittingRows'
+
+/** Unstretched height of one suggestion row; the list shows as many of them as its height allows. */
+const SUGGESTION_ROW_HEIGHT = 56
+
+/** Height of the pagination toolbar, taken out of the list so the panel never grows. */
+const PAGINATION_HEIGHT = 36
+
+/**
+ * The list is a fixed slice of the page rather than a content-sized box. That matters: the row
+ * count comes from measuring this element, so a content-sized one would shrink to whatever it last
+ * rendered and never grow back past a single row.
+ */
+const LIST_HEIGHT = `calc(min(280px, 26dvh) - ${PAGINATION_HEIGHT}px)`
 
 interface SuggestionsPanelProps<T> {
   title: string
@@ -14,11 +30,14 @@ interface SuggestionsPanelProps<T> {
   renderRow: (suggestion: T) => ReactNode
   onApplyAll: () => void
   onApply: (suggestion: T) => void
+  /** Clicking the row itself (not its Apply button) shows the transactions it refers to. */
+  onSelect: (suggestion: T) => void
 }
 
 /**
  * Pending auto-detected pairs of rows: review them and apply each one or all at once. Nothing is
- * linked until it is applied here.
+ * linked until it is applied here. The list pages itself so a long backlog cannot stretch the card,
+ * and clicking a row (rather than its Apply button) shows the transactions it refers to.
  */
 export function SuggestionsPanel<T>({
   title,
@@ -29,7 +48,16 @@ export function SuggestionsPanel<T>({
   renderRow,
   onApplyAll,
   onApply,
+  onSelect,
 }: SuggestionsPanelProps<T>) {
+  const [page, setPage] = useState(0)
+  const { containerRef, rows: perPage } = useFittingRows(suggestions.length, {
+    rowSelector: '[data-row]',
+    naturalRowHeight: SUGGESTION_ROW_HEIGHT,
+  })
+  const shownPage = Math.min(page, Math.max(0, Math.ceil(suggestions.length / perPage) - 1))
+  const pageSuggestions = suggestions.slice(shownPage * perPage, shownPage * perPage + perPage)
+
   return (
     <Paper variant="outlined" sx={{ borderRadius: 3, px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
@@ -46,26 +74,67 @@ export function SuggestionsPanel<T>({
         </Button>
       </Box>
       <Box
+        ref={containerRef}
         sx={{
           display: 'flex',
           flexDirection: 'column',
           gap: 0.5,
-          maxHeight: 'min(280px, 22dvh)',
-          overflow: 'auto',
+          height: LIST_HEIGHT,
+          overflowY: 'auto',
         }}
       >
-        {suggestions.map((suggestion) => (
+        {pageSuggestions.map((suggestion) => (
           <Box
             key={rowKey(suggestion)}
-            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, py: 0.75, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+            data-row="suggestion"
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelect(suggestion)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onSelect(suggestion)
+              }
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              minHeight: SUGGESTION_ROW_HEIGHT,
+              px: 1,
+              py: 0.75,
+              borderRadius: 1.5,
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
           >
             <Box sx={{ minWidth: 0, flexGrow: 1 }}>{renderRow(suggestion)}</Box>
-            <Button size="small" onClick={() => onApply(suggestion)} disabled={busy}>
+            <Button
+              size="small"
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation()
+                onApply(suggestion)
+              }}
+            >
               Apply
             </Button>
           </Box>
         ))}
       </Box>
+
+      {suggestions.length > perPage ? (
+        <TablePagination
+          component="div"
+          count={suggestions.length}
+          page={shownPage}
+          onPageChange={(_event, nextPage) => setPage(nextPage)}
+          rowsPerPage={perPage}
+          rowsPerPageOptions={[]}
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
+          sx={{ flexShrink: 0, '.MuiTablePagination-toolbar': { minHeight: PAGINATION_HEIGHT } }}
+        />
+      ) : null}
     </Paper>
   )
 }
