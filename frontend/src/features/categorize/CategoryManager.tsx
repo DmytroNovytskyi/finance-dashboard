@@ -18,6 +18,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { useFittingRows } from '../../hooks/useFittingRows'
+import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { useCreateCategory, useDeleteCategory, useUncategorizeCategory, useUpdateCategory } from './hooks'
 
 interface CategoryManagerProps {
@@ -52,7 +53,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const mutationError = (create.error ?? update.error ?? remove.error ?? unlink.error) as Error | null
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage, rowHeight } = useFittingRows(categories.length, {
+  const { containerRef, container, rows: perPage, rowHeight } = useFittingRows(categories.length, {
     rowSelector: '[data-row]',
     paginationSelector: '.MuiTablePagination-root',
     paginationHeight: PAGINATION_HEIGHT,
@@ -61,6 +62,14 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const maxPage = Math.max(0, Math.ceil(categories.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageCategories = categories.slice(shownPage * perPage, shownPage * perPage + perPage)
+
+  usePageOnWheel(container, {
+    onNext: () => setPage((current) => Math.min(current + 1, maxPage)),
+    onPrevious: () => setPage((current) => Math.max(current - 1, 0)),
+    canNext: shownPage < maxPage,
+    canPrevious: shownPage > 0,
+    enabled: maxPage > 0,
+  })
 
   const openCreate = () => setEditor({ open: true, name: '', color: EMPTY_COLOR })
   const openEdit = (category: CategoryPresentation) => setEditor({ open: true, id: category.id, name: category.name, color: category.color })
@@ -103,6 +112,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           flex: 1,
           minHeight: CATEGORY_ROW_HEIGHT,
           overflowY: 'auto',
+          overscrollBehaviorY: 'contain',
         }}
       >
         {pageCategories.map((category) => (

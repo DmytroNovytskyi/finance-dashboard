@@ -32,6 +32,7 @@ import { queryKeys } from '../../api/keys'
 import { useAccounts, useAccountsById } from '../../api/queries'
 import { PageHeader, PageShell } from '../../components/PageLayout'
 import { useFittingRows } from '../../hooks/useFittingRows'
+import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { formatDate, formatDateTime, formatInteger } from '../../lib/format'
 
 
@@ -88,7 +89,7 @@ export function ImportPage() {
   const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: fittingRows } = useFittingRows(statementsQuery.data?.length ?? 0, {
+  const { containerRef, container, rows: fittingRows } = useFittingRows(statementsQuery.data?.length ?? 0, {
     rowSelector: 'tbody tr',
     reservedSelector: 'thead',
   })
@@ -171,6 +172,14 @@ export function ImportPage() {
   const rowsPerPage = fittingRows
   const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1)
   const shownPage = Math.min(page, maxPage)
+
+  usePageOnWheel(container, {
+    onNext: () => setPage((current) => Math.min(current + 1, maxPage)),
+    onPrevious: () => setPage((current) => Math.max(current - 1, 0)),
+    canNext: shownPage < maxPage,
+    canPrevious: shownPage > 0,
+    enabled: maxPage > 0,
+  })
   const shownRows = allStatements.slice(shownPage * rowsPerPage, shownPage * rowsPerPage + rowsPerPage)
   const canImport = files.length > 0 && !busy
 
@@ -380,7 +389,7 @@ export function ImportPage() {
                 ) : null}
               </Box>
             </Box>
-            <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0 }}>
+            <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0, overscrollBehaviorY: 'contain' }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>

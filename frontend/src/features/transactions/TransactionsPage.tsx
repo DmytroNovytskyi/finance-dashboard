@@ -24,6 +24,7 @@ import { useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
 import { LinkActions } from './LinkActions'
 import { useFittingRows } from '../../hooks/useFittingRows'
+import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { RefundSuggestionRow, TransferSuggestionRow } from './SuggestionRows'
 import { TransactionFilters } from './TransactionFilters'
 import { TABLE_ROW_HEIGHT, TransactionTable } from './TransactionTable'
@@ -89,12 +90,22 @@ export function TransactionsPage() {
   })
 
   const totalElements = listQuery.data?.totalElements ?? 0
-  const { containerRef, rows: rowsPerPage, rowHeight } = useFittingRows(totalElements, {
+  const { containerRef, container, rows: rowsPerPage, rowHeight } = useFittingRows(totalElements, {
     rowSelector: 'tbody tr',
     reservedSelector: 'thead',
     paginationSelector: '.MuiTablePagination-root',
     paginationHeight: PAGINATION_HEIGHT,
     naturalRowHeight: TABLE_ROW_HEIGHT,
+  })
+  const maxPage = Math.max(0, Math.ceil(totalElements / rowsPerPage) - 1)
+  const shownPage = Math.min(page, maxPage)
+
+  usePageOnWheel(container, {
+    onNext: () => setPage((current) => Math.min(current + 1, maxPage)),
+    onPrevious: () => setPage((current) => Math.max(current - 1, 0)),
+    canNext: shownPage < maxPage && !listQuery.isFetching,
+    canPrevious: shownPage > 0 && !listQuery.isFetching,
+    enabled: maxPage > 0,
   })
 
   useEffect(() => {

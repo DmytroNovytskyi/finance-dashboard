@@ -17,6 +17,7 @@ import type { CategoryPresentation } from '../../api/queries'
 import { uncategorizedColor, useScheme } from '../../theme'
 import type { MerchantRule } from '../../types'
 import { useFittingRows } from '../../hooks/useFittingRows'
+import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import {
   useApplyMerchantRule,
   useCreateMerchantRule,
@@ -60,7 +61,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   }, [rules.data, categories])
 
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage, rowHeight } = useFittingRows(orderedRules.length, {
+  const { containerRef, container, rows: perPage, rowHeight } = useFittingRows(orderedRules.length, {
     rowSelector: '[data-row]',
     paginationSelector: '.MuiTablePagination-root',
     paginationHeight: PAGINATION_HEIGHT,
@@ -69,6 +70,14 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const maxPage = Math.max(0, Math.ceil(orderedRules.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageRules = orderedRules.slice(shownPage * perPage, shownPage * perPage + perPage)
+
+  usePageOnWheel(container, {
+    onNext: () => setPage((current) => Math.min(current + 1, maxPage)),
+    onPrevious: () => setPage((current) => Math.max(current - 1, 0)),
+    canNext: shownPage < maxPage,
+    canPrevious: shownPage > 0,
+    enabled: maxPage > 0,
+  })
 
   const save = () => {
     if (!merchant.trim() || categoryId === '') return
@@ -118,6 +127,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           flex: 1,
           minHeight: DEFAULT_ROW_HEIGHT,
           overflowY: 'auto',
+          overscrollBehaviorY: 'contain',
         }}
       >
         {rules.isLoading ? (

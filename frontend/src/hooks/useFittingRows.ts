@@ -31,6 +31,13 @@ interface FittingRowsOptions {
 interface FittingRows {
   /** Attach to the scrolling container whose height the rows must fill. */
   containerRef: (node: HTMLElement | null) => void
+  /**
+   * The element the ref above attached to, or null on the first render. Callers that need to
+   * listen on that element should take it from here rather than attaching a second ref: the
+   * element is state, so its identity changes exactly when the node does, which is the dependency
+   * an attach-and-detach effect needs.
+   */
+  container: HTMLElement | null
   rows: number
   /**
    * The height to give each row, or null when no natural height was supplied. It is worked out
@@ -110,5 +117,5 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
     max,
   ])
 
-  return { containerRef: setContainer, rows, rowHeight }
+  return { containerRef: setContainer, container, rows, rowHeight }
 }

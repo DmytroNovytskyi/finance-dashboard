@@ -14,6 +14,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { useFittingRows } from '../../hooks/useFittingRows'
+import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
 import type { Transaction } from '../../types'
@@ -73,7 +74,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const rows = queue.data?.content ?? []
   const total = queue.data?.totalElements ?? 0
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage, rowHeight } = useFittingRows(rows.length, {
+  const { containerRef, container, rows: perPage, rowHeight } = useFittingRows(rows.length, {
     rowSelector: '[data-row]',
     paginationSelector: '.MuiTablePagination-root',
     paginationHeight: PAGINATION_HEIGHT,
@@ -82,6 +83,14 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const maxPage = Math.max(0, Math.ceil(rows.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
   const pageRows = rows.slice(shownPage * perPage, shownPage * perPage + perPage)
+
+  usePageOnWheel(container, {
+    onNext: () => setPage((current) => Math.min(current + 1, maxPage)),
+    onPrevious: () => setPage((current) => Math.max(current - 1, 0)),
+    canNext: shownPage < maxPage,
+    canPrevious: shownPage > 0,
+    enabled: maxPage > 0,
+  })
   const allPageSelected = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
   const somePageSelected = pageRows.some((row) => selected.has(row.id))
 
@@ -266,6 +275,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
           minWidth: 0,
           minHeight: QUEUE_ROW_HEIGHT,
           overflowY: 'auto',
+          overscrollBehaviorY: 'contain',
         }}
       >
         {queue.isLoading ? (

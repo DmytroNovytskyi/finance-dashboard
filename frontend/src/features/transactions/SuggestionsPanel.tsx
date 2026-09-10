@@ -6,6 +6,7 @@ import TablePagination from '@mui/material/TablePagination'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 import { useFittingRows } from '../../hooks/useFittingRows'
+import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 
 /** Unstretched height of one suggestion row, which is a single truncated line. */
 const SUGGESTION_ROW_HEIGHT = 40
@@ -56,12 +57,21 @@ export function SuggestionsPanel<T>({
   onSelect,
 }: SuggestionsPanelProps<T>) {
   const [page, setPage] = useState(0)
-  const { containerRef, rows: perPage } = useFittingRows(suggestions.length, {
+  const { containerRef, container, rows: perPage } = useFittingRows(suggestions.length, {
     rowSelector: '[data-row]',
     naturalRowHeight: SUGGESTION_ROW_HEIGHT,
   })
-  const shownPage = Math.min(page, Math.max(0, Math.ceil(suggestions.length / perPage) - 1))
+  const maxPage = Math.max(0, Math.ceil(suggestions.length / perPage) - 1)
+  const shownPage = Math.min(page, maxPage)
   const pageSuggestions = suggestions.slice(shownPage * perPage, shownPage * perPage + perPage)
+
+  usePageOnWheel(container, {
+    onNext: () => setPage((current) => Math.min(current + 1, maxPage)),
+    onPrevious: () => setPage((current) => Math.max(current - 1, 0)),
+    canNext: shownPage < maxPage,
+    canPrevious: shownPage > 0,
+    enabled: maxPage > 0,
+  })
 
   return (
     <Paper variant="outlined" sx={{ borderRadius: 3, px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -86,6 +96,7 @@ export function SuggestionsPanel<T>({
           gap: 0.5,
           height: LIST_HEIGHT,
           overflowY: 'auto',
+          overscrollBehaviorY: 'contain',
         }}
       >
         {pageSuggestions.map((suggestion) => (

@@ -279,7 +279,7 @@ export function TransactionTable({
       variant="outlined"
       sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 140 }}
     >
-      <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0 }}>
+      <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0, overscrollBehaviorY: 'contain' }}>
         <Table size="small" stickyHeader sx={{ minWidth: 860, tableLayout: 'fixed' }}>
           <TableHead>
             <TableRow>
