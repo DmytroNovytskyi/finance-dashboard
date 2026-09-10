@@ -57,3 +57,13 @@ export function useFittingRows(rowCount: number, options: FittingRowsOptions): F
 
   return { containerRef: setContainer, rows }
 }
+
+/**
+ * Whether a page of rows should stretch to fill its container. Only a full page should: it has
+ * less than one row's height left over, so growing the rows hides a remainder too small to hold
+ * another row. A list shorter than a page keeps its natural row height and leaves the space below
+ * empty, rather than spreading a few rows over the whole card.
+ */
+export function stretchesToFill(shown: number, perPage: number): boolean {
+  return perPage > 0 && shown >= perPage
+}
