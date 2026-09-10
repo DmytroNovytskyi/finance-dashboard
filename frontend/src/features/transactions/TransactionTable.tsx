@@ -53,13 +53,16 @@ interface TransactionTableProps {
   onUnlinkRefund: (id: number) => void
 }
 
-/** The bordered tag that marks a row as part of a detected pair. */
+/**
+ * The bordered tag that marks a row as part of a detected pair. It sits on the description's line
+ * rather than above it, so it must never be the thing that gives way when space is short.
+ */
 function PairTag({ label }: { label: string }) {
   return (
     <Box
       component="span"
       sx={{
-        typography: 'caption',
+        typography: 'body2',
         fontWeight: 600,
         color: 'text.secondary',
         border: '1px solid',
@@ -67,7 +70,8 @@ function PairTag({ label }: { label: string }) {
         borderRadius: 1,
         px: 0.75,
         py: 0,
-        mr: 1,
+        lineHeight: 1.2,
+        flexShrink: 0,
         whiteSpace: 'nowrap',
       }}
     >
@@ -266,11 +270,13 @@ export function TransactionTable({
                       {formatDate(transaction.transactionDate)}
                     </TableCell>
                     <TableCell>
-                      {isSuggested ? <PairTag label="Internal" /> : null}
-                      {isRefundSuggested ? <PairTag label="Refund" /> : null}
-                      <Typography variant="body2" noWrap>
-                        {transaction.description || transaction.merchant || '—'}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                        {isSuggested ? <PairTag label="Internal" /> : null}
+                        {isRefundSuggested ? <PairTag label="Refund" /> : null}
+                        <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
+                          {transaction.description || transaction.merchant || '—'}
+                        </Typography>
+                      </Box>
                       {transaction.merchant && transaction.merchant !== transaction.description ? (
                         <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                           {transaction.merchant}
