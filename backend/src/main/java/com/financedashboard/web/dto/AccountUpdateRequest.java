@@ -1,16 +1,16 @@
 package com.financedashboard.web.dto;
 
 import com.financedashboard.domain.account.AccountKind;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotBlank;
 
-/** Partial update for an account; null fields leave the value unchanged. */
+/**
+ * The user-owned fields of an account. The currency and the account number are written by the
+ * statement import that creates the account and are deliberately absent here, so no client can
+ * change them. A null kind clears the personal/business tag.
+ */
 public record AccountUpdateRequest(
+        @NotBlank(message = "name must not be blank")
         String name,
 
-        @Pattern(regexp = "[A-Za-z]{3}", message = "currency must be a 3-letter ISO 4217 code")
-        String currency,
-
-        AccountKind kind,
-
-        String accountNumber) {
+        AccountKind kind) {
 }

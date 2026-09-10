@@ -33,6 +33,8 @@ export interface TransactionListParams {
 
 export type TransactionSortKey = 'date' | 'amount' | 'account' | 'category'
 
+export type StatementSortKey = 'imported' | 'file' | 'account' | 'period'
+
 export interface StatisticsParams {
   from?: string
   to?: string
@@ -56,11 +58,17 @@ export interface AccountInput {
   accountNumber?: string | null
 }
 
+/** The user-owned account fields; the server owns the currency and the account number. */
+export interface AccountUpdateInput {
+  name: string
+  kind?: Account['kind'] | null
+}
+
 export const accountsApi = {
   list: () => request<Account[]>('/accounts'),
   create: (input: AccountInput) =>
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(input) }),
-  update: (id: number, input: Partial<AccountInput>) =>
+  update: (id: number, input: AccountUpdateInput) =>
     request<Account>(`/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   /** Removes the account together with all its statements and transactions. */
   remove: (id: number) => request<{ count: number }>(`/accounts/${id}`, { method: 'DELETE' }),
@@ -78,8 +86,16 @@ export const categoriesApi = {
     request<{ count: number }>(`/categories/${id}/uncategorize`, { method: 'POST' }),
 }
 
+/** Server-side ordering and filtering of the statements list. */
+export interface StatementListParams {
+  sort?: StatementSortKey
+  order?: 'asc' | 'desc'
+  accountId?: number
+}
+
 export const statementsApi = {
-  list: () => request<Statement[]>('/statements'),
+  list: (params: StatementListParams = {}) =>
+    request<Statement[]>(`/statements${buildQuery(params)}`),
   coverage: () => request<StatementCoverage[]>('/statements/coverage'),
   importPdf: (file: File) => {
     const body = new FormData()

@@ -48,8 +48,7 @@ public class AccountController {
 
     @PatchMapping("/{id}")
     public AccountResponse update(@PathVariable Long id, @Valid @RequestBody AccountUpdateRequest request) {
-        return AccountResponse.from(accounts.update(
-                id, request.name(), request.currency(), request.kind(), request.accountNumber()));
+        return AccountResponse.from(accounts.update(id, request.name(), request.kind()));
     }
 
     /**

@@ -83,6 +83,73 @@ class AccountApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void updateCannotChangeTheCurrencyOrTheAccountNumber() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/accounts")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Personal PLN","currency":"PLN","accountNumber":"123456"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/v1/accounts/{id}", id)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Renamed","currency":"USD","accountNumber":"999999"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Renamed"))
+                .andExpect(jsonPath("$.currency").value("PLN"))
+                .andExpect(jsonPath("$.accountNumber").value("123456"));
+    }
+
+    @Test
+    void updateClearsTheKindWhenNoneIsGiven() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/accounts")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Personal PLN","currency":"PLN","kind":"PERSONAL"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/v1/accounts/{id}", id)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Personal PLN"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kind").doesNotExist());
+    }
+
+    @Test
+    void updateRejectsABlankName() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/accounts")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"Personal PLN","currency":"PLN"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/v1/accounts/{id}", id)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"name":"   "}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteRemovesTheAccountItsStatementsAndTransactions() throws Exception {
         String body = mockMvc.perform(post("/api/v1/accounts")
                         .contentType(APPLICATION_JSON)

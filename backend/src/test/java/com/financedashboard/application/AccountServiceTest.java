@@ -84,10 +84,10 @@ class AccountServiceTest {
     }
 
     @Test
-    void updateAppliesProvidedFieldsAndKeepsOthers() {
+    void updateRenamesTheAccountAndKeepsTheServerOwnedFields() {
         givenStored(storedAccount("123"));
 
-        Account updated = service.update(1L, "New", null, AccountKind.BUSINESS, null);
+        Account updated = service.update(1L, "New", AccountKind.BUSINESS);
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getCurrency()).isEqualTo("PLN");
@@ -97,21 +97,28 @@ class AccountServiceTest {
     }
 
     @Test
-    void updateClearsAccountNumberOnlyWhenExplicitlyBlank() {
-        givenStored(storedAccount("123"));
+    void updateClearsTheKindWhenNoneIsGiven() {
+        givenStored(storedAccount("123").toBuilder().kind(AccountKind.PERSONAL).build());
 
-        Account updated = service.update(1L, null, null, null, "");
+        Account updated = service.update(1L, "New", null);
 
-        assertThat(updated.getAccountNumber()).isNull();
+        assertThat(updated.getKind()).isNull();
     }
 
     @Test
-    void updateCanonicalizesAProvidedAccountNumber() {
+    void updateTrimsTheName() {
         givenStored(storedAccount("123"));
 
-        Account updated = service.update(1L, null, null, null,
-                "PL 00 0000 0000 0000 0000 0000 0001");
+        Account updated = service.update(1L, "  Renamed  ", null);
 
-        assertThat(updated.getAccountNumber()).isEqualTo("00000000000000000000000001");
+        assertThat(updated.getName()).isEqualTo("Renamed");
+    }
+
+    @Test
+    void updateRejectsBlankName() {
+        when(accounts.findById(1L)).thenReturn(Optional.of(storedAccount("123")));
+
+        assertThatThrownBy(() -> service.update(1L, "   ", null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

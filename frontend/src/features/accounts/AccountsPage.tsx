@@ -24,6 +24,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { accountsApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
+import { PageHeader, PageShell } from '../../components/PageLayout'
 import type { Account, AccountKind } from '../../types'
 
 const KIND_OPTIONS: { value: AccountKind; label: string }[] = [
@@ -31,18 +32,22 @@ const KIND_OPTIONS: { value: AccountKind; label: string }[] = [
   { value: 'BUSINESS', label: 'Business' },
 ]
 
-interface AccountForm {
+/** The account fields the user owns. Currency and account number come from the statements. */
+interface AccountDraft {
   name: string
-  currency: string
   kind: AccountKind | null
-  accountNumber: string
+}
+
+interface AccountEditor {
+  account: Account
+  draft: AccountDraft
 }
 
 /** List accounts; each one is created by its statements and removed with its last transaction. */
 export function AccountsPage() {
   const queryClient = useQueryClient()
   const accounts = useQuery({ queryKey: queryKeys.accounts, queryFn: accountsApi.list })
-  const [editor, setEditor] = useState<{ id: number; form: AccountForm } | null>(null)
+  const [editor, setEditor] = useState<AccountEditor | null>(null)
   const [toDelete, setToDelete] = useState<Account | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -54,7 +59,8 @@ export function AccountsPage() {
   }
 
   const setKind = useMutation({
-    mutationFn: ({ id, kind }: { id: number; kind: AccountKind | null }) => accountsApi.update(id, { kind }),
+    mutationFn: ({ id, name, kind }: { id: number; name: string; kind: AccountKind | null }) =>
+      accountsApi.update(id, { name, kind }),
     onSuccess: invalidate,
   })
 
@@ -68,13 +74,8 @@ export function AccountsPage() {
   })
 
   const saveAccount = useMutation({
-    mutationFn: ({ id, form }: { id: number; form: AccountForm }) =>
-      accountsApi.update(id, {
-        name: form.name.trim(),
-        currency: form.currency.toUpperCase(),
-        kind: form.kind ?? undefined,
-        accountNumber: form.accountNumber || null,
-      }),
+    mutationFn: ({ account, draft }: AccountEditor) =>
+      accountsApi.update(account.id, { name: draft.name.trim(), kind: draft.kind }),
     onSuccess: () => {
       invalidate()
       setEditor(null)
@@ -87,22 +88,16 @@ export function AccountsPage() {
   const untyped = rows.filter((account) => account.kind === null)
 
   const submit = () => {
-    if (!editor || !editor.form.name.trim()) return
+    if (!editor || !editor.draft.name.trim()) return
     saveAccount.mutate(editor)
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Accounts
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Accounts appear when you import their statements and disappear once no transaction
-          remains. Set each account&apos;s type — the personal/business split in the overview
-          follows it.
-        </Typography>
-      </Box>
+    <PageShell>
+      <PageHeader
+        title="Accounts"
+        subtitle="Accounts appear when you import their statements and disappear once no transaction remains. Set each account's type — the personal/business split in the overview follows it."
+      />
 
       {untyped.length > 0 ? (
         <Alert severity="info">
@@ -112,9 +107,19 @@ export function AccountsPage() {
 
       {mutationError ? <Alert severity="error">{mutationError.message}</Alert> : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table size="small">
+      <Paper
+        variant="outlined"
+        sx={{
+          borderRadius: 3,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 240,
+        }}
+      >
+        <TableContainer sx={{ flex: 1, minHeight: 0 }}>
+          <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell>Account</TableCell>
@@ -144,15 +149,7 @@ export function AccountsPage() {
                         <IconButton
                           size="small"
                           onClick={() =>
-                            setEditor({
-                              id: account.id,
-                              form: {
-                                name: account.name,
-                                currency: account.currency,
-                                kind: account.kind,
-                                accountNumber: account.accountNumber ?? '',
-                              },
-                            })
+                            setEditor({ account, draft: { name: account.name, kind: account.kind } })
                           }
                           aria-label={`Edit ${account.name}`}
                         >
@@ -169,7 +166,10 @@ export function AccountsPage() {
                       <Typography variant="body2">{account.currency}</Typography>
                     </TableCell>
                     <TableCell>
-                      <KindSelect value={account.kind} onChange={(kind) => setKind.mutate({ id: account.id, kind })} />
+                      <KindSelect
+                        value={account.kind}
+                        onChange={(kind) => setKind.mutate({ id: account.id, name: account.name, kind })}
+                      />
                     </TableCell>
                     <TableCell align="right">
                       <IconButton size="small" onClick={() => setToDelete(account)} aria-label={`Delete ${account.name}`}>
@@ -191,30 +191,33 @@ export function AccountsPage() {
             <TextField
               autoFocus
               label="Name"
-              value={editor?.form.name ?? ''}
-              onChange={(event) => setEditor((current) => current && { ...current, form: { ...current.form, name: event.target.value } })}
+              value={editor?.draft.name ?? ''}
+              onChange={(event) => setEditor((current) => current && { ...current, draft: { ...current.draft, name: event.target.value } })}
               fullWidth
               size="small"
             />
+            <KindSelect
+              value={editor?.draft.kind ?? null}
+              onChange={(kind) => setEditor((current) => current && { ...current, draft: { ...current.draft, kind } })}
+            />
             <TextField
               label="Currency"
-              value={editor?.form.currency ?? ''}
+              value={editor?.account.currency ?? ''}
               fullWidth
               size="small"
               disabled
               helperText="Comes from the imported statements; not editable."
             />
-            <KindSelect value={editor?.form.kind ?? null} onChange={(kind) => setEditor((current) => current && { ...current, form: { ...current.form, kind } })} />
             <TextField
               label="Account number (IBAN)"
-              value={editor?.form.accountNumber ?? ''}
-              onChange={(event) => setEditor((current) => current && { ...current, form: { ...current.form, accountNumber: event.target.value } })}
+              value={editor?.account.accountNumber ?? ''}
               fullWidth
               size="small"
+              disabled
               helperText={
-                editor?.form.accountNumber.trim()
-                  ? 'Used to match future statements to this account.'
-                  : 'Empty — set it so future statements of this account are matched to it.'
+                editor?.account.accountNumber
+                  ? 'Comes from the imported statements; matches later imports to this account.'
+                  : 'The imported statements carry no account number for this account.'
               }
             />
           </Box>
@@ -224,7 +227,7 @@ export function AccountsPage() {
           <Button
             variant="contained"
             onClick={submit}
-            disabled={!editor?.form.name.trim() || !editor.form.currency.trim() || saveAccount.isPending}
+            disabled={!editor?.draft.name.trim() || saveAccount.isPending}
           >
             Save
           </Button>
@@ -256,7 +259,7 @@ export function AccountsPage() {
       </Dialog>
 
       <Snackbar open={notice !== null} autoHideDuration={4000} onClose={() => setNotice(null)} message={notice} />
-    </Box>
+    </PageShell>
   )
 }
 

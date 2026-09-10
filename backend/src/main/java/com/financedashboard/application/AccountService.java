@@ -42,16 +42,15 @@ public class AccountService {
         return accounts.save(account);
     }
 
-    /** Applies the non-null fields to the account with the given id. */
-    public Account update(Long id, String name, String currency, AccountKind kind, String accountNumber) {
+    /**
+     * Applies the user-owned fields to the account with the given id. The currency and the account
+     * number belong to the statement import that created the account and are left as they are.
+     */
+    public Account update(Long id, String name, AccountKind kind) {
         Account current = get(id);
         Account account = current.toBuilder()
-                .name(name != null ? requireName(name) : current.getName())
-                .currency(currency != null ? requireCurrency(currency) : current.getCurrency())
-                .kind(kind != null ? kind : current.getKind())
-                .accountNumber(accountNumber != null
-                        ? AccountNumbers.canonical(accountNumber)
-                        : current.getAccountNumber())
+                .name(requireName(name))
+                .kind(kind)
                 .build();
         return accounts.save(account);
     }

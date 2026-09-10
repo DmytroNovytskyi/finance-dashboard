@@ -12,8 +12,10 @@ the file, the name is a default label) and are **removed automatically** once th
 transactions or statements (deleting an account's last statement deletes the account). They can
 also be **deleted explicitly**, which removes the account, its statements, and all its
 transactions (re-importing a statement recreates the account). The user renames the account and
-tags its `kind`; `currency` follows the statements, and `account_number` is stored in canonical
-digits-only form so later statements of the same account are matched to it.
+tags its `kind`; those two are the only fields a client can change (`PATCH` ignores anything
+else). `currency` and `account_number` are **server-owned**: both are written from the imported
+statement, and `account_number` is stored in canonical digits-only form so later statements of
+the same account are matched to it.
 
 | column | type | notes |
 |---|---|---|

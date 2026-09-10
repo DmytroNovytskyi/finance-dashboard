@@ -50,8 +50,11 @@ Accounts are **created automatically** when a statement import names them (curre
 account number come from the file, name defaulted) and **removed automatically** once they hold
 no transactions or statements. The user renames the account and tags its `kind` (`PERSONAL` /
 `BUSINESS`) via `PATCH /api/v1/accounts/{id}`, which drives the statistics personal-vs-business
-split; currency and the canonical account number are set by the statements and used to recognize
-later imports of the same account.
+split. `PATCH` carries **only** those two user-owned fields: the currency and the canonical
+account number are set by the statements, used to recognize later imports of the same account,
+and cannot be changed through the API — `AccountUpdateRequest` omits them, so a client that sends
+them has them ignored rather than applied. Accounts have no manual create or edit path in the UI;
+the only user actions are rename, tag, and delete.
 `nature=TRANSFER` rows (incl. internal transfers between the user's own accounts)
 are excluded from every statistic; they carry the reserved **Internal Transfer** category (system
 rows, non-deletable) so they appear and filter as a normal group in the UI.
