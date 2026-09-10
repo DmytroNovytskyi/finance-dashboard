@@ -4,6 +4,7 @@ import type {
   MerchantRule,
   PageResponse,
   Statement,
+  StatementCoverage,
   StatementImportResult,
   StatisticsCategorySeries,
   StatisticsCategoryTrend,
@@ -79,6 +80,7 @@ export const categoriesApi = {
 
 export const statementsApi = {
   list: () => request<Statement[]>('/statements'),
+  coverage: () => request<StatementCoverage[]>('/statements/coverage'),
   importPdf: (file: File) => {
     const body = new FormData()
     body.append('file', file)

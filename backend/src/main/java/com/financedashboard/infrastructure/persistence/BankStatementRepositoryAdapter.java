@@ -27,6 +27,11 @@ public class BankStatementRepositoryAdapter implements BankStatementRepository {
     }
 
     @Override
+    public List<BankStatement> findAllByOrderByPeriodStartAsc() {
+        return mapper.toDomain(jpa.findAllByOrderByPeriodStartAsc());
+    }
+
+    @Override
     public List<BankStatement> findByAccountId(Long accountId) {
         return mapper.toDomain(jpa.findByAccountIdOrderByImportedAtDesc(accountId));
     }

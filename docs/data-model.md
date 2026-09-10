@@ -67,7 +67,7 @@ One imported file, attributed to exactly one account.
 | id | bigserial PK | |
 | account_id | bigint FK → account not null | |
 | bank | varchar not null | e.g. `MONOBANK` |
-| period_start / period_end | date | |
+| period_start / period_end | date | nullable; drive statement coverage, derived on read |
 | file_name | varchar | |
 | file_hash | varchar unique | SHA-256; dedup on re-import |
 | imported_at | timestamptz | |

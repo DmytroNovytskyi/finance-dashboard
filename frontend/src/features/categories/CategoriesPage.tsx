@@ -18,6 +18,7 @@ import { ChartCard } from '../../components/ChartCard'
 import { ChartTooltipCard } from '../../components/ChartTooltip'
 import { EmptyState } from '../../components/EmptyState'
 import { SeriesLegend } from '../../components/SeriesLegend'
+import { StatementFreshness } from '../../components/StatementFreshness'
 import type { CategoryPresentation } from '../../api/queries'
 import type { StatisticsCategorySeriesPoint, StatisticsGranularity, StatisticsTrendPoint } from '../../types'
 import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
@@ -245,6 +246,8 @@ export function CategoriesPage() {
           )}
         </Select>
       </Box>
+
+      <StatementFreshness />
 
       {selected.length > 0 ? (
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>

@@ -15,6 +15,7 @@ import { DATE_RANGE_PRESETS, rangeForPreset, type DateRange, type DateRangePrese
 import { amountColor, useScheme } from '../../theme'
 import { formatInteger, formatMoney, formatMoneyMagnitude, formatTrendBucket } from '../../lib/format'
 import { ChartCard } from '../../components/ChartCard'
+import { StatementFreshness } from '../../components/StatementFreshness'
 import type { StatisticsGranularity, StatisticsTrendPoint, TransactionNature } from '../../types'
 import { CategoryDonut, type DonutRow } from './CategoryDonut'
 import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
@@ -205,6 +206,8 @@ export function OverviewPage() {
       {overviewQuery.isError ? (
         <Alert severity="error">Could not load the statistics. Check that the backend is running.</Alert>
       ) : null}
+
+      <StatementFreshness />
 
       <Box
         sx={{

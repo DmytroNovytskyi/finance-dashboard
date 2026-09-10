@@ -72,6 +72,20 @@ export interface StatementImportResult {
   skipped: number
 }
 
+export interface PeriodGap {
+  from: string
+  to: string
+}
+
+export interface StatementCoverage {
+  accountId: number
+  earliestPeriodStart: string | null
+  latestPeriodEnd: string | null
+  statementCount: number
+  gaps: PeriodGap[]
+  missingPeriodEnds: string[]
+}
+
 export type StatisticsGranularity = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
 export interface StatisticsSummary {

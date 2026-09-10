@@ -13,6 +13,9 @@ public interface BankStatementRepository {
     /** Returns all statements, most recently imported first. */
     List<BankStatement> findAllByOrderByImportedAtDesc();
 
+    /** Returns all statements ordered by the period they cover, earliest first. */
+    List<BankStatement> findAllByOrderByPeriodStartAsc();
+
     /** Returns all statements attributed to the account with the given id. */
     List<BankStatement> findByAccountId(Long accountId);
 

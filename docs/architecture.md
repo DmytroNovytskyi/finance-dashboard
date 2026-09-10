@@ -112,7 +112,18 @@ Statements: `POST /api/v1/statements` (multipart import; the owning account is r
 statement — by its account number, else its currency — and created if unknown, so no account is
 chosen at upload),
 `GET /api/v1/statements` (list, newest first, each with the count of stored transactions it
-introduced), and `DELETE /api/v1/statements/{id}` (removes the statement and the transaction rows
+introduced), `DELETE /api/v1/statements/{id}` (removes the statement and the transaction rows
 it introduced, un-pairing any surviving transfer leg, so its file can be re-imported; an account
-left with no transactions or statements is removed as well). Original documents are not stored —
-only their metadata and the parsed, deduplicated transactions.
+left with no transactions or statements is removed as well), and
+`GET /api/v1/statements/coverage` (per account, the earliest and latest period covered, any hole
+between consecutive statements, and any period that has closed without a statement). Original
+documents are not stored — only their metadata and the parsed, deduplicated transactions.
+
+Coverage is derived on read by `StatementCoverage` in the domain, from the account's statements
+alone — nothing is persisted for it. Periods are compared by **contiguity** (`next.periodStart`
+equals `previous.periodEnd` plus one day) rather than by calendar month, because accounts close on
+different cycles: some on a fixed day of the month, others at month end. A calendar-month rule
+would report false gaps. The next expected period end is the latest one plus whole months, which
+preserves both cycle styles (a fixed day is kept, a month end clamps to the shorter month) and
+deliberately avoids drifting a month-end cycle backwards. A reported gap or missing period is
+*possibly* absent data — a month with no activity may legitimately produce no statement.

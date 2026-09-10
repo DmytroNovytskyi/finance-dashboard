@@ -1,9 +1,11 @@
 package com.financedashboard.web.controller;
 
+import com.financedashboard.application.StatementCoverageService;
 import com.financedashboard.application.StatementImportService;
 import com.financedashboard.application.StatementService;
 import com.financedashboard.application.TransactionEditService;
 import com.financedashboard.domain.exception.StatementParseException;
+import com.financedashboard.web.dto.StatementCoverageResponse;
 import com.financedashboard.web.dto.StatementImportResponse;
 import com.financedashboard.web.dto.StatementResponse;
 import java.io.IOException;
@@ -29,11 +31,17 @@ public class StatementController {
 
     private final StatementImportService importService;
     private final StatementService statements;
+    private final StatementCoverageService coverageService;
     private final TransactionEditService edits;
 
     @GetMapping
     public List<StatementResponse> list() {
         return statements.list().stream().map(StatementResponse::from).toList();
+    }
+
+    @GetMapping("/coverage")
+    public List<StatementCoverageResponse> coverage() {
+        return coverageService.coverage().stream().map(StatementCoverageResponse::from).toList();
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

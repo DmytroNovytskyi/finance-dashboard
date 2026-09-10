@@ -6,6 +6,7 @@ export const queryKeys = {
   categories: ['categories'] as const,
   merchantRules: ['merchant-rules'] as const,
   statements: ['statements'] as const,
+  statementCoverage: ['statements', 'coverage'] as const,
   transfers: ['transfers'] as const,
   transactions: {
     root: ['transactions'] as const,
