@@ -42,8 +42,11 @@ function toMinor(value: number): number {
 function refundShape(selected: Transaction[]): RefundShape | string {
   const expenses = selected.filter((transaction) => transaction.amount < 0)
   const credits = selected.filter((transaction) => transaction.amount > 0)
-  if (expenses.length !== 1) return 'needs exactly one expense to act as the purchase'
-  if (credits.length === 0) return 'needs at least one income to act as the credit'
+  if (expenses.length === 0) return 'select the purchase too: the expense these credits reverse'
+  if (expenses.length > 1) {
+    return `${expenses.length} expenses selected; a refund reverses one purchase, so keep one and add as many credits as you like`
+  }
+  if (credits.length === 0) return 'add at least one income: the credit that came back'
   const [purchase] = expenses
   if (selected.some((transaction) => transaction.accountId !== purchase.accountId)) {
     return 'a refund must stay within one account'
@@ -66,7 +69,7 @@ function transferShape(selected: Transaction[]): TransferShape | string {
   const expenses = selected.filter((transaction) => transaction.amount < 0)
   const incomes = selected.filter((transaction) => transaction.amount > 0)
   if (expenses.length !== 1 || incomes.length !== 1) {
-    return 'needs exactly one expense and one income'
+    return `a transfer is two rows, one out and one in; you selected ${expenses.length} out and ${incomes.length} in`
   }
   const [from] = expenses
   const [to] = incomes
