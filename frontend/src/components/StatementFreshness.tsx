@@ -55,12 +55,12 @@ export function StatementFreshness() {
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      <Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, flexWrap: 'wrap' }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           Statement freshness
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="caption" color="text.secondary">
           How far each account&apos;s imported statements reach.
         </Typography>
       </Box>
@@ -74,19 +74,19 @@ export function StatementFreshness() {
         </Alert>
       ) : null}
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 4, rowGap: 1 }}>
         {rows.map((row) => {
           const problem = coverageProblem(row)
           return (
-            <Box key={row.accountId} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            <Box key={row.accountId} sx={{ minWidth: 200 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
                 {accountsById.get(row.accountId)?.name ?? `Account ${row.accountId}`}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                 {coverageSummary(row)}
               </Typography>
               {problem ? (
-                <Typography variant="body2" color="warning.main">
+                <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
                   {problem}
                 </Typography>
               ) : null}

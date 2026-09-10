@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box'
-import Grid from '@mui/material/Grid'
-import Typography from '@mui/material/Typography'
 import { useCategories } from '../../api/queries'
+import { PageHeader, PageShell } from '../../components/PageLayout'
 import { CategoryManager } from './CategoryManager'
 import { MerchantDefaults } from './MerchantDefaults'
 import { UncategorizedQueue } from './UncategorizedQueue'
@@ -10,26 +9,38 @@ import { UncategorizedQueue } from './UncategorizedQueue'
 export function CategorizePage() {
   const categories = useCategories()
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Categorize
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Assign spending groups so the overview breakdown is meaningful.
-        </Typography>
-      </Box>
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <CategoryManager categories={categories} />
-            <MerchantDefaults categories={categories} />
-          </Box>
-        </Grid>
-        <Grid size={{ xs: 12, lg: 8 }}>
+    <PageShell>
+      <PageHeader
+        title="Categorize"
+        subtitle="Assign spending groups so the overview breakdown is meaningful."
+      />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', lg: 'row' },
+          gap: 2,
+          flex: { xs: 'none', lg: 1 },
+          minHeight: 0,
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            flex: { xs: 'none', lg: '0 0 32%' },
+            minWidth: 0,
+            minHeight: 0,
+            overflowY: 'auto',
+          }}
+        >
+          <CategoryManager categories={categories} />
+          <MerchantDefaults categories={categories} />
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
           <UncategorizedQueue categories={categories} />
-        </Grid>
-      </Grid>
-    </Box>
+        </Box>
+      </Box>
+    </PageShell>
   )
 }

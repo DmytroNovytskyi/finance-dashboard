@@ -145,9 +145,12 @@ export function TransactionTable({
   const visibleRows = allRows.slice(page * size, page * size + size)
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-      <TableContainer>
-        <Table size="small" sx={{ minWidth: 860 }}>
+    <Paper
+      variant="outlined"
+      sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 240 }}
+    >
+      <TableContainer sx={{ flex: 1, minHeight: 0 }}>
+        <Table size="small" stickyHeader sx={{ minWidth: 860 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 110 }}>

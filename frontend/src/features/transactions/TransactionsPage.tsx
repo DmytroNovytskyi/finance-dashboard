@@ -7,7 +7,6 @@ import CircularProgress from '@mui/material/CircularProgress'
 import DeleteSweep from '@mui/icons-material/DeleteSweep'
 import LinearProgress from '@mui/material/LinearProgress'
 import Snackbar from '@mui/material/Snackbar'
-import Typography from '@mui/material/Typography'
 import {
   useAccounts,
   useAccountsById,
@@ -18,6 +17,7 @@ import { transactionsApi, transfersApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
 import type { AccountPresentation } from '../../api/queries'
 import type { TransferSuggestion } from '../../types'
+import { PageHeader, PageShell } from '../../components/PageLayout'
 import { useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
 import { TransactionFilters } from './TransactionFilters'
@@ -133,25 +133,21 @@ export function TransactionsPage() {
   })
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            Transactions
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Filter, review, and delete by range.
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<DeleteSweep />}
-          onClick={() => setDeleteOpen(true)}
-        >
-          Delete by range
-        </Button>
-      </Box>
+    <PageShell>
+      <PageHeader
+        title="Transactions"
+        subtitle="Filter, review, and delete by range."
+        action={
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteSweep />}
+            onClick={() => setDeleteOpen(true)}
+          >
+            Delete by range
+          </Button>
+        }
+      />
 
       {(suggestionsQuery.data?.length ?? 0) > 0 ? (
         <SuggestionsPanel
@@ -210,6 +206,6 @@ export function TransactionsPage() {
         onClose={() => setSnackbar(null)}
         message={snackbar}
       />
-    </Box>
+    </PageShell>
   )
 }

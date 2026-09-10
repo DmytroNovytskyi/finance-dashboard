@@ -41,19 +41,14 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {isMobile ? (
-        <AppBar position="fixed" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Toolbar>
-            <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
-              <Menu />
-            </IconButton>
-            <Typography variant="h6" noWrap>
-              Finance Dashboard
-            </Typography>
-          </Toolbar>
-        </AppBar>
-      ) : null}
+    <Box
+      sx={{
+        display: 'flex',
+        height: '100dvh',
+        overflow: 'hidden',
+        bgcolor: 'background.default',
+      }}
+    >
 
       <Drawer
         variant={isMobile ? 'temporary' : 'permanent'}
@@ -82,16 +77,42 @@ export function AppShell() {
       </Drawer>
 
       <Box
-        component="main"
         sx={{
           flexGrow: 1,
           minWidth: 0,
-          px: { xs: 2, md: 4 },
-          py: { xs: 2, md: 4 },
-          mt: isMobile ? '64px' : 0,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
-        <Outlet />
+        {isMobile ? (
+          <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Toolbar>
+              <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
+                <Menu />
+              </IconButton>
+              <Typography variant="h6" noWrap>
+                Finance Dashboard
+              </Typography>
+            </Toolbar>
+          </AppBar>
+        ) : null}
+
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            px: { xs: 2, md: 4 },
+            py: { xs: 2, md: 3 },
+            overflowY: 'auto',
+          }}
+        >
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   )

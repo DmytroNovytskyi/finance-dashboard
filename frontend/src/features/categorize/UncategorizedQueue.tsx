@@ -84,7 +84,18 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2.5,
+        borderRadius: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.5,
+        height: '100%',
+        minWidth: 0,
+      }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="h6" component="h3">
@@ -176,7 +187,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
         <Typography variant="caption">Select page</Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, overflow: 'auto' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto' }}>
         {queue.isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />

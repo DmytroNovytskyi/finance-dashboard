@@ -17,6 +17,7 @@ import { amountColor, chartInk, useScheme } from '../../theme'
 import { ChartCard } from '../../components/ChartCard'
 import { ChartTooltipCard } from '../../components/ChartTooltip'
 import { EmptyState } from '../../components/EmptyState'
+import { PageHeader, PageScroll, PageShell } from '../../components/PageLayout'
 import { SeriesLegend } from '../../components/SeriesLegend'
 import { StatementFreshness } from '../../components/StatementFreshness'
 import type { CategoryPresentation } from '../../api/queries'
@@ -193,15 +194,11 @@ export function CategoriesPage() {
   }, [period, categoryIds, granularity])
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Categories
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          A chart per category; the period and granularity below drive every chart.
-        </Typography>
-      </Box>
+    <PageShell>
+      <PageHeader
+        title="Categories"
+        subtitle="A chart per category; the period and granularity below drive every chart."
+      />
 
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
         <Box sx={{ flexGrow: 1, minWidth: 320 }}>
@@ -249,38 +246,40 @@ export function CategoriesPage() {
 
       <StatementFreshness />
 
-      {selected.length > 0 ? (
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          {selected.map((category) => (
-            <Chip
-              key={category.id}
-              label={category.name}
-              onDelete={() => removeCategory(category.id)}
-              size="small"
-              variant="outlined"
-            />
-          ))}
-        </Box>
-      ) : null}
+      <PageScroll>
+        {selected.length > 0 ? (
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
+            {selected.map((category) => (
+              <Chip
+                key={category.id}
+                label={category.name}
+                onDelete={() => removeCategory(category.id)}
+                size="small"
+                variant="outlined"
+              />
+            ))}
+          </Box>
+        ) : null}
 
-      {selected.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
-          <Typography color="text.secondary">Add a category above to chart its income and expenses over time.</Typography>
-        </Paper>
-      ) : (
-        <Grid container spacing={2}>
-          {selected.map((category) => (
-            <Grid key={category.id} size={12}>
-              {granularity !== 'transaction' ? (
-                <CategoryTrendCard category={category} range={period.range} granularity={granularity} displayCurrency={displayCurrency} />
-              ) : (
-                <CategorySeriesCard category={category} range={period.range} displayCurrency={displayCurrency} />
-              )}
-            </Grid>
-          ))}
-        </Grid>
-      )}
-    </Box>
+        {selected.length === 0 ? (
+          <Paper variant="outlined" sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
+            <Typography color="text.secondary">Add a category above to chart its income and expenses over time.</Typography>
+          </Paper>
+        ) : (
+          <Grid container spacing={2}>
+            {selected.map((category) => (
+              <Grid key={category.id} size={12}>
+                {granularity !== 'transaction' ? (
+                  <CategoryTrendCard category={category} range={period.range} granularity={granularity} displayCurrency={displayCurrency} />
+                ) : (
+                  <CategorySeriesCard category={category} range={period.range} displayCurrency={displayCurrency} />
+                )}
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </PageScroll>
+    </PageShell>
   )
 }
 

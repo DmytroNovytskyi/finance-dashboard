@@ -15,6 +15,7 @@ import { DATE_RANGE_PRESETS, rangeForPreset, type DateRange, type DateRangePrese
 import { amountColor, useScheme } from '../../theme'
 import { formatInteger, formatMoney, formatMoneyMagnitude, formatTrendBucket } from '../../lib/format'
 import { ChartCard } from '../../components/ChartCard'
+import { PageHeader, PageScroll, PageShell } from '../../components/PageLayout'
 import { StatementFreshness } from '../../components/StatementFreshness'
 import type { StatisticsGranularity, StatisticsTrendPoint, TransactionNature } from '../../types'
 import { CategoryDonut, type DonutRow } from './CategoryDonut'
@@ -189,15 +190,8 @@ export function OverviewPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Overview
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Where the money comes from and where it goes.
-        </Typography>
-      </Box>
+    <PageShell>
+      <PageHeader title="Overview" subtitle="Where the money comes from and where it goes." />
 
       <Box sx={{ minWidth: 320 }}>
         <PeriodSelector preset={period.preset} range={period.range} onChange={changePeriod} />
@@ -209,18 +203,21 @@ export function OverviewPage() {
 
       <StatementFreshness />
 
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-          opacity: trendQuery.isPlaceholderData || overviewQuery.isPlaceholderData ? 0.5 : 1,
-          transition: 'opacity 150ms',
-          pointerEvents: trendQuery.isPlaceholderData || overviewQuery.isPlaceholderData ? 'none' : 'auto',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minHeight: 32, flexWrap: 'wrap' }}>
-          {focus ? (
+      <PageScroll>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            flex: 1,
+            minHeight: 0,
+            opacity: trendQuery.isPlaceholderData || overviewQuery.isPlaceholderData ? 0.5 : 1,
+            transition: 'opacity 150ms',
+            pointerEvents: trendQuery.isPlaceholderData || overviewQuery.isPlaceholderData ? 'none' : 'auto',
+          }}
+        >
+        {focus ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', flexShrink: 0 }}>
             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
               <Typography variant="body2" color="text.secondary">
                 Showing
@@ -235,8 +232,8 @@ export function OverviewPage() {
                 in the donut &amp; merchants; the trend keeps the full period.
               </Typography>
             </Box>
-          ) : null}
-        </Box>
+          </Box>
+        ) : null}
 
         <Grid container spacing={2}>
           {totals ? (
@@ -267,33 +264,35 @@ export function OverviewPage() {
           )}
         </Grid>
 
-        <Grid container spacing={2}>
-          <Grid size={12}>
-            <ChartCard
-              title="Income and expenses"
-              action={<TrendControls granularity={granularity} onGranularityChange={changeGranularity} />}
-              chartHeight={300}
-            >
-              <TrendChart
-                data={trendQuery.data?.trend ?? []}
-                baseCurrency={baseCurrency}
-                granularity={granularity}
-                onSelect={(point: StatisticsTrendPoint) => setFocus({ from: point.start, to: point.end })}
-              />
-            </ChartCard>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <ChartCard title="Spend by category" subtitle="Click a slice to see the transactions" chartHeight={300}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minHeight: 140 }}>
+          <ChartCard
+            title="Income and expenses"
+            action={<TrendControls granularity={granularity} onGranularityChange={changeGranularity} />}
+            chartHeight={90}
+          >
+            <TrendChart
+              data={trendQuery.data?.trend ?? []}
+              baseCurrency={baseCurrency}
+              granularity={granularity}
+              onSelect={(point: StatisticsTrendPoint) => setFocus({ from: point.start, to: point.end })}
+            />
+          </ChartCard>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flex: '1 1 0', minHeight: 140 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0 }}>
+            <ChartCard title="Spend by category" subtitle="Click a slice to see the transactions" chartHeight={90}>
               <CategoryDonut byCategory={overviewQuery.data?.byCategory ?? []} baseCurrency={baseCurrency} onSelect={(row: DonutRow) => openTransactions(row.categoryId === null ? { uncategorized: true } : { categoryId: row.categoryId })} />
             </ChartCard>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <ChartCard title="Top merchants" chartHeight={300}>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0 }}>
+            <ChartCard title="Top merchants" chartHeight={90}>
               <TopMerchantsChart topMerchants={overviewQuery.data?.topMerchants ?? []} baseCurrency={baseCurrency} />
             </ChartCard>
-          </Grid>
-        </Grid>
-      </Box>
-    </Box>
+          </Box>
+        </Box>
+        </Box>
+      </PageScroll>
+    </PageShell>
   )
 }

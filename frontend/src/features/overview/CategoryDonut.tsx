@@ -55,7 +55,7 @@ export function CategoryDonut({ byCategory, baseCurrency, onSelect }: CategoryDo
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', height: '100%' }}>
       {rows.length >= 2 ? (
-        <Box sx={{ flex: '1 1 220px', minWidth: 0, height: '100%' }}>
+        <Box sx={{ flex: '1 1 220px', minWidth: 0, height: '100%', overflow: 'hidden' }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -88,7 +88,22 @@ export function CategoryDonut({ byCategory, baseCurrency, onSelect }: CategoryDo
           </Typography>
         </Box>
       )}
-      <Box component="ul" sx={{ flex: '1 1 260px', minWidth: 220, m: 0, p: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box
+        component="ul"
+        sx={{
+          flex: '1 1 260px',
+          minWidth: 220,
+          minHeight: 0,
+          maxHeight: '100%',
+          overflowY: 'auto',
+          m: 0,
+          p: 0,
+          listStyle: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+        }}
+      >
         {rows.map((row) => {
           const share = Math.round((row.value / total) * 100)
           return (
