@@ -46,17 +46,26 @@ money goes.
 ## Deploy
 
 See [docs/deployment.md](docs/deployment.md) for the full layout and steps. In short, on a
-host with the repo cloned into a deploy directory:
+deploy directory outside the repo:
 
 ```bash
-cp deploy/docker-compose.yml ./docker-compose.yml
-cp .env.example .env     # then fill in DB_USER / DB_PASSWORD
-mkdir data
-docker compose up -d
+git clone <repo-url> app
+cp app/deploy/docker-compose.yml ./docker-compose.yml
+cp app/.env.example .env     # then fill in DB_USER / DB_PASSWORD
+mkdir data                   # must be empty on the first run
+docker compose up -d --build
 ```
 
 The Compose file, the `.env` secrets, and the `data/` directory all live outside the
-repository.
+repository. The UI is published on `:8100` (`FRONTEND_PORT`); the database and the API publish
+no ports and are reachable only from the Compose network.
+
+To update a running deployment, pull in `app/` and rebuild:
+
+```bash
+cd app && git pull
+cd .. && docker compose up -d --build
+```
 
 ## Local development
 
