@@ -3,7 +3,20 @@ import type { AccountPresentation } from '../../api/queries'
 import { formatDate, formatMoneyMagnitude } from '../../lib/format'
 import type { RefundSuggestion, TransferSuggestion } from '../../types'
 
-/** Text block of one suggested own-account transfer: both accounts, the sum, and the match basis. */
+/**
+ * One line of suggestion text, cut off with an ellipsis when the panel is too narrow for it and
+ * readable in full on hover. Everything a row says goes through here so both kinds of suggestion
+ * take the same single line and the same row height.
+ */
+function SuggestionLine({ text }: { text: string }) {
+  return (
+    <Typography variant="body2" noWrap title={text}>
+      {text}
+    </Typography>
+  )
+}
+
+/** Text of one suggested own-account transfer: both accounts, the sum, the date, and the match basis. */
 export function TransferSuggestionRow({
   suggestion,
   accounts,
@@ -12,23 +25,18 @@ export function TransferSuggestionRow({
   accounts: Map<number, AccountPresentation>
 }) {
   const accountName = (id: number) => accounts.get(id)?.name ?? `Account ${id}`
-  return (
-    <>
-      <Typography variant="body2" noWrap>
-        {formatMoneyMagnitude(suggestion.amount, suggestion.currency)} ·{' '}
-        {accountName(suggestion.fromAccountId)} → {accountName(suggestion.toAccountId)}
-      </Typography>
-      <Typography variant="caption" color="text.secondary">
-        {formatDate(suggestion.fromDate)}
-        {suggestion.reason === 'AMOUNT' ? ' · equal-amount match' : ''}
-      </Typography>
-    </>
-  )
+  const parts = [
+    formatMoneyMagnitude(suggestion.amount, suggestion.currency),
+    `${accountName(suggestion.fromAccountId)} → ${accountName(suggestion.toAccountId)}`,
+    formatDate(suggestion.fromDate),
+    suggestion.reason === 'AMOUNT' ? 'equal-amount match' : '',
+  ]
+  return <SuggestionLine text={parts.filter(Boolean).join(' · ')} />
 }
 
 /**
- * Text block of one suggested refund: the purchase it reverses, when, how many credits gave it
- * back, and why it was matched.
+ * Text of one suggested refund: the purchase it reverses, when, how many credits gave it back, and
+ * why it was matched.
  */
 export function RefundSuggestionRow({
   suggestion,
@@ -39,18 +47,14 @@ export function RefundSuggestionRow({
 }) {
   const accountName = accounts.get(suggestion.accountId)?.name ?? `Account ${suggestion.accountId}`
   const credits = suggestion.refundTransactionIds.length
-  return (
-    <>
-      <Typography variant="body2" noWrap>
-        {formatMoneyMagnitude(suggestion.amount, suggestion.currency)}
-        {suggestion.merchant ? ` · ${suggestion.merchant}` : ''}
-        {credits > 1 ? ` · ${credits} credits` : ''}
-      </Typography>
-      <Typography variant="caption" color="text.secondary">
-        {accountName} · bought {formatDate(suggestion.purchaseDate)} · refunded{' '}
-        {formatDate(suggestion.refundDate)}
-        {suggestion.reason === 'AMOUNT' ? ' · equal-amount match' : ''}
-      </Typography>
-    </>
-  )
+  const parts = [
+    formatMoneyMagnitude(suggestion.amount, suggestion.currency),
+    suggestion.merchant,
+    credits > 1 ? `${credits} credits` : '',
+    accountName,
+    `bought ${formatDate(suggestion.purchaseDate)}`,
+    `refunded ${formatDate(suggestion.refundDate)}`,
+    suggestion.reason === 'AMOUNT' ? 'equal-amount match' : '',
+  ]
+  return <SuggestionLine text={parts.filter(Boolean).join(' · ')} />
 }

@@ -7,8 +7,8 @@ import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 import { useFittingRows } from '../../hooks/useFittingRows'
 
-/** Unstretched height of one suggestion row; the list shows as many of them as its height allows. */
-const SUGGESTION_ROW_HEIGHT = 56
+/** Unstretched height of one suggestion row, which is a single truncated line. */
+const SUGGESTION_ROW_HEIGHT = 40
 
 /**
  * What the list gives up for the bar, which is MUI's default toolbar height. Reserving less lets
@@ -107,7 +107,6 @@ export function SuggestionsPanel<T>({
               gap: 1.5,
               minHeight: SUGGESTION_ROW_HEIGHT,
               px: 1,
-              py: 0.75,
               borderRadius: 1.5,
               cursor: 'pointer',
               '&:hover': { bgcolor: 'action.hover' },
