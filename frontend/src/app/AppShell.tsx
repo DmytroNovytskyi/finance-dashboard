@@ -27,7 +27,7 @@ const DRAWER_WIDTH = 280
 
 const NAV_ITEMS = [
   { to: '/', label: 'Overview', icon: Dashboard, end: true },
-  { to: '/categories', label: 'Categories', icon: ShowChart, end: false },
+  { to: '/trends', label: 'Trends', icon: ShowChart, end: false },
   { to: '/transactions', label: 'Transactions', icon: ReceiptLong, end: false },
   { to: '/categorize', label: 'Categorize', icon: Sell, end: false },
   { to: '/import', label: 'Import', icon: UploadFile, end: false },

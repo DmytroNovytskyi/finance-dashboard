@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
 import { AppShell } from './app/AppShell'
@@ -9,7 +9,7 @@ const TransactionsPage = lazy(() =>
   import('./features/transactions/TransactionsPage').then((module) => ({ default: module.TransactionsPage })),
 )
 const CategorizePage = lazy(() => import('./features/categorize/CategorizePage').then((module) => ({ default: module.CategorizePage })))
-const CategoriesPage = lazy(() => import('./features/categories/CategoriesPage').then((module) => ({ default: module.CategoriesPage })))
+const TrendsPage = lazy(() => import('./features/trends/TrendsPage').then((module) => ({ default: module.TrendsPage })))
 const ImportPage = lazy(() => import('./features/import/ImportPage').then((module) => ({ default: module.ImportPage })))
 const AccountsPage = lazy(() => import('./features/accounts/AccountsPage').then((module) => ({ default: module.AccountsPage })))
 
@@ -28,7 +28,8 @@ export function AppRoutes() {
           <Route index element={<OverviewPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="categorize" element={<CategorizePage />} />
-          <Route path="categories" element={<CategoriesPage />} />
+          <Route path="trends" element={<TrendsPage />} />
+          <Route path="categories" element={<Navigate to="/trends" replace />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="accounts" element={<AccountsPage />} />
         </Route>

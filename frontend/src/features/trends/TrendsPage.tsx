@@ -25,7 +25,8 @@ import type { StatisticsCategorySeriesPoint, StatisticsGranularity, StatisticsTr
 import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
 import { PeriodSelector } from '../overview/PeriodSelector'
 
-const CATEGORIES_STORAGE_KEY = 'finance-dashboard.categories.v1'
+/** Kept under its original name so the saved period and category choice survive the rename. */
+const TRENDS_STORAGE_KEY = 'finance-dashboard.categories.v1'
 const DEFAULT_PERIOD: PeriodState = { preset: 'thisYear', range: rangeForPreset('thisYear') }
 
 type CategoryGranularity = 'transaction' | StatisticsGranularity
@@ -52,7 +53,7 @@ interface PeriodState {
   range: DateRange
 }
 
-interface StoredCategoriesState {
+interface StoredTrendsState {
   preset?: unknown
   from?: unknown
   to?: unknown
@@ -60,18 +61,18 @@ interface StoredCategoriesState {
   granularity?: unknown
 }
 
-interface StoredCategories {
+interface StoredTrends {
   period: PeriodState
   categoryIds: number[]
   granularity: CategoryGranularity
 }
 
-function loadCategoriesState(): StoredCategories {
-  const fallback: StoredCategories = { period: DEFAULT_PERIOD, categoryIds: [], granularity: 'transaction' }
+function loadTrendsState(): StoredTrends {
+  const fallback: StoredTrends = { period: DEFAULT_PERIOD, categoryIds: [], granularity: 'transaction' }
   try {
-    const raw = window.localStorage.getItem(CATEGORIES_STORAGE_KEY)
+    const raw = window.localStorage.getItem(TRENDS_STORAGE_KEY)
     if (!raw) return fallback
-    const stored = JSON.parse(raw) as StoredCategoriesState
+    const stored = JSON.parse(raw) as StoredTrendsState
     const preset = typeof stored.preset === 'string' ? (stored.preset as DateRangePreset) : DEFAULT_PERIOD.preset
     const period: PeriodState =
       preset === 'custom'
@@ -153,12 +154,12 @@ function bucketStatsOf(buckets: StatisticsTrendPoint[]): CategoryStats {
 }
 
 /** One line chart per category at a page-level granularity (per transaction or time buckets). */
-export function CategoriesPage() {
+export function TrendsPage() {
   const categories = useCategories()
   const { displayCurrency } = useDisplayCurrency()
-  const [period, setPeriod] = useState<PeriodState>(() => loadCategoriesState().period)
-  const [granularity, setGranularity] = useState<CategoryGranularity>(() => loadCategoriesState().granularity)
-  const [categoryIds, setCategoryIds] = useState<number[]>(() => loadCategoriesState().categoryIds)
+  const [period, setPeriod] = useState<PeriodState>(() => loadTrendsState().period)
+  const [granularity, setGranularity] = useState<CategoryGranularity>(() => loadTrendsState().granularity)
+  const [categoryIds, setCategoryIds] = useState<number[]>(() => loadTrendsState().categoryIds)
   const [pending, setPending] = useState('')
 
   const byId = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
@@ -179,7 +180,7 @@ export function CategoriesPage() {
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        CATEGORIES_STORAGE_KEY,
+        TRENDS_STORAGE_KEY,
         JSON.stringify({
           preset: period.preset,
           from: period.range.from,
@@ -196,7 +197,7 @@ export function CategoriesPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Categories"
+        title="Trends"
         subtitle="A chart per category; the period and granularity below drive every chart."
       />
 
@@ -378,7 +379,7 @@ function CategorySeriesCard({
       subtitle={`in ${baseCurrency} · each point is one transaction`}
       action={legend.length > 1 ? <SeriesLegend items={legend} /> : null}
       meta={points.length > 0 ? <StatStrip stats={stats} currency={baseCurrency} countLabel="Transactions" /> : null}
-      chartHeight={260}
+      chartHeight={320}
     >
       {points.length === 0 ? (
         <EmptyState title={`Nothing for ${category.name} in this period`} hint="Pick a wider period or another category." />
@@ -477,7 +478,7 @@ function CategoryTrendCard({
       subtitle={`in ${baseCurrency} · ${granularityLabel(granularity).toLowerCase()} buckets`}
       action={legend.length > 1 ? <SeriesLegend items={legend} /> : null}
       meta={data.length > 0 ? <StatStrip stats={stats} currency={baseCurrency} countLabel="Periods" /> : null}
-      chartHeight={260}
+      chartHeight={320}
     >
       {data.length === 0 ? (
         <EmptyState title={`Nothing for ${category.name} in this period`} hint="Pick a wider period or another category." />
