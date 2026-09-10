@@ -31,11 +31,14 @@ export function CategorizePage() {
             flex: { xs: 'none', lg: '0 0 32%' },
             minWidth: 0,
             minHeight: 0,
-            overflowY: 'auto',
           }}
         >
-          <CategoryManager categories={categories} />
-          <MerchantDefaults categories={categories} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <CategoryManager categories={categories} />
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <MerchantDefaults categories={categories} />
+          </Box>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
           <UncategorizedQueue categories={categories} />

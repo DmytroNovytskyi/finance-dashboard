@@ -8,9 +8,11 @@ import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import ToggleButton from '@mui/material/ToggleButton'
+import TablePagination from '@mui/material/TablePagination'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
+import { useFittingRows } from '../../hooks/useFittingRows'
 import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
 import type { Transaction } from '../../types'
@@ -56,6 +58,13 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
 
   const rows = queue.data?.content ?? []
   const total = queue.data?.totalElements ?? 0
+  const [page, setPage] = useState(0)
+  const { containerRef, rows: perPage } = useFittingRows(rows.length, { rowSelector: '[data-row]' })
+  const maxPage = Math.max(0, Math.ceil(rows.length / perPage) - 1)
+  const shownPage = Math.min(page, maxPage)
+  const pageRows = rows.slice(shownPage * perPage, shownPage * perPage + perPage)
+  const allPageSelected = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
+  const somePageSelected = pageRows.some((row) => selected.has(row.id))
 
   const single = selected.size === 1 ? rows.find((row) => selected.has(row.id)) : undefined
   const merchant = single?.merchant ?? null
@@ -79,8 +88,12 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
     setRemember(false)
   }
 
-  const selectVisible = (checked: boolean) => {
-    setSelected(checked ? new Set(rows.map((row) => row.id)) : new Set())
+  const selectPage = (checked: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current)
+      pageRows.forEach((row) => (checked ? next.add(row.id) : next.delete(row.id)))
+      return next
+    })
   }
 
   return (
@@ -114,6 +127,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
               setNature(value)
               setSelected(new Set())
               setRemember(false)
+              setPage(0)
             }
           }}
         >
@@ -180,14 +194,17 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
         <Checkbox
           size="small"
-          indeterminate={selected.size > 0 && selected.size < rows.length}
-          checked={rows.length > 0 && selected.size === rows.length}
-          onChange={(event) => selectVisible(event.target.checked)}
+          indeterminate={somePageSelected && !allPageSelected}
+          checked={allPageSelected}
+          onChange={(event) => selectPage(event.target.checked)}
         />
         <Typography variant="caption">Select page</Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto' }}>
+      <Box
+        ref={containerRef}
+        sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minWidth: 0, minHeight: 48, overflowY: 'auto' }}
+      >
         {queue.isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
@@ -197,10 +214,11 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
             Nothing left to categorize. Nice work.
           </Typography>
         ) : (
-          rows.map((transaction) => (
+          pageRows.map((transaction) => (
             <Box
               key={transaction.id}
-              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+              data-row="queue"
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 48, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
             >
               <Checkbox size="small" checked={selected.has(transaction.id)} onChange={() => toggle(transaction.id)} aria-label={`Select transaction ${transaction.id}`} />
               <Box sx={{ minWidth: 0, flexGrow: 1 }}>
@@ -239,6 +257,19 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
           ))
         )}
       </Box>
+
+      {rows.length > perPage ? (
+        <TablePagination
+          component="div"
+          count={rows.length}
+          page={shownPage}
+          onPageChange={(_event, nextPage) => setPage(nextPage)}
+          rowsPerPage={perPage}
+          rowsPerPageOptions={[]}
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
+          sx={{ flexShrink: 0, '.MuiTablePagination-toolbar': { minHeight: 40 } }}
+        />
+      ) : null}
 
       {!queue.isLoading && total > QUEUE_SIZE ? (
         <Typography variant="caption" color="text.disabled">

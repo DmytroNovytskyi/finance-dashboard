@@ -17,7 +17,10 @@ export interface CategoryPresentation {
   system: boolean
 }
 
-/** Categories in display order (sortOrder, then name), each with a resolved color. */
+/**
+ * Categories in display order — alphabetical by name, with the reserved system category pinned
+ * last so it never competes with the user's own groups — each with a resolved color.
+ */
 export function useCategories(): CategoryPresentation[] {
   const categories = useQuery({ queryKey: queryKeys.categories, queryFn: categoriesApi.list })
   const scheme = useScheme()
@@ -26,7 +29,7 @@ export function useCategories(): CategoryPresentation[] {
 
 function orderCategories(categories: Category[], scheme: 'light' | 'dark'): CategoryPresentation[] {
   const sorted = [...categories].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+    (a, b) => Number(a.system) - Number(b.system) || a.name.localeCompare(b.name),
   )
   return sorted.map((category, index) => ({
     id: category.id,

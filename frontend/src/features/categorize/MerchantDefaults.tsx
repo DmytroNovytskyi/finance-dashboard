@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Add from '@mui/icons-material/Add'
 import Delete from '@mui/icons-material/Delete'
 import LinkOff from '@mui/icons-material/LinkOff'
@@ -11,9 +11,12 @@ import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import Snackbar from '@mui/material/Snackbar'
 import TextField from '@mui/material/TextField'
+import TablePagination from '@mui/material/TablePagination'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { uncategorizedColor, useScheme } from '../../theme'
+import type { MerchantRule } from '../../types'
+import { useFittingRows } from '../../hooks/useFittingRows'
 import {
   useApplyMerchantRule,
   useCreateMerchantRule,
@@ -42,6 +45,20 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedCategory = categoryId !== '' ? categoryById.get(Number(categoryId)) : undefined
 
+  const orderedRules = useMemo(() => {
+    const nameOf = (rule: MerchantRule) =>
+      categoryById.get(rule.categoryId)?.name ?? `Category ${rule.categoryId}`
+    return [...(rules.data ?? [])].sort(
+      (a, b) => nameOf(a).localeCompare(nameOf(b)) || a.merchant.localeCompare(b.merchant),
+    )
+  }, [rules.data, categories])
+
+  const [page, setPage] = useState(0)
+  const { containerRef, rows: perPage } = useFittingRows(orderedRules.length, { rowSelector: '[data-row]' })
+  const maxPage = Math.max(0, Math.ceil(orderedRules.length / perPage) - 1)
+  const shownPage = Math.min(page, maxPage)
+  const pageRules = orderedRules.slice(shownPage * perPage, shownPage * perPage + perPage)
+
   const save = () => {
     if (!merchant.trim() || categoryId === '') return
     create.mutate({ merchant: merchant.trim(), categoryId: Number(categoryId) })
@@ -68,7 +85,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const mutationError = (create.error ?? applyOne.error ?? unlink.error ?? remove.error) as Error | null
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
+    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%', minHeight: 300 }}>
       <Box>
         <Typography variant="h6" component="h3">
           Defaults by counterparty
@@ -81,21 +98,24 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
 
       {mutationError ? <Alert severity="error">{mutationError.message}</Alert> : null}
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box
+        ref={containerRef}
+        sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minHeight: 48, overflowY: 'auto' }}
+      >
         {rules.isLoading ? (
           <Typography variant="body2" color="text.secondary">
             Loading…
           </Typography>
-        ) : (rules.data ?? []).length === 0 ? (
+        ) : orderedRules.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No defaults yet. Select one uncategorized row and check “remember counterparty”.
           </Typography>
         ) : (
-          (rules.data ?? []).map((rule) => {
+          pageRules.map((rule) => {
             const category = categoryById.get(rule.categoryId)
             const color = category?.color ?? rule.color ?? uncategorizedColor[scheme]
             return (
-              <Box key={rule.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}>
+              <Box key={rule.id} data-row="default" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 48, py: 0.75, px: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}>
                 <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
                 <Box sx={{ minWidth: 0, flexGrow: 1 }}>
                   <Typography variant="body2" noWrap title={rule.merchant}>
@@ -119,6 +139,19 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           })
         )}
       </Box>
+
+      {orderedRules.length > perPage ? (
+        <TablePagination
+          component="div"
+          count={orderedRules.length}
+          page={shownPage}
+          onPageChange={(_event, nextPage) => setPage(nextPage)}
+          rowsPerPage={perPage}
+          rowsPerPageOptions={[]}
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
+          sx={{ flexShrink: 0, '.MuiTablePagination-toolbar': { minHeight: 40 } }}
+        />
+      ) : null}
 
       <Box sx={{ display: 'flex', gap: 1, pt: 1 }}>
         <TextField
