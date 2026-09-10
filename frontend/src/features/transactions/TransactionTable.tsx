@@ -22,6 +22,13 @@ import type { PageResponse, Transaction } from '../../types'
 import type { TransactionSortKey } from '../../api/endpoints'
 import type { TransactionSort } from './model'
 
+/**
+ * Unstretched height of one row: the tallest a row gets now that its description, counterparty and
+ * account are each held to a single line. Rows share out whatever height the table has left, and
+ * this is the floor that share is worked out from, so a page always fills the table exactly.
+ */
+export const TABLE_ROW_HEIGHT = 53
+
 interface TransactionTableProps {
   data: PageResponse<Transaction> | undefined
   accounts: Map<number, AccountPresentation>
@@ -33,6 +40,8 @@ interface TransactionTableProps {
   containerRef: (node: HTMLElement | null) => void
   /** Rows one page holds, worked out from the space the container has. */
   rowsPerPage: number
+  /** Height each row takes so the page fills the table, or null before it has been measured. */
+  rowHeight: number | null
   page: number
   onPageChange: (page: number) => void
   /** Ids of the legs of pending internal-transfer suggestions; those rows get an "Internal" tag. */
@@ -180,6 +189,7 @@ export function TransactionTable({
   onSortChange,
   containerRef,
   rowsPerPage,
+  rowHeight,
   page,
   onPageChange,
   suggestionIds,
@@ -251,7 +261,7 @@ export function TransactionTable({
                 const isRefundSuggested =
                   transaction.nature !== 'REFUND' && refundSuggestionIds.has(transaction.id)
                 return (
-                  <TableRow key={transaction.id} hover>
+                  <TableRow key={transaction.id} hover sx={{ height: rowHeight ?? TABLE_ROW_HEIGHT }}>
                     <TableCell sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {formatDate(transaction.transactionDate)}
                     </TableCell>

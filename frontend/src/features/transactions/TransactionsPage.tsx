@@ -25,7 +25,7 @@ import { DeleteRangeDialog } from './DeleteRangeDialog'
 import { useFittingRows } from '../../hooks/useFittingRows'
 import { RefundSuggestionRow, TransferSuggestionRow } from './SuggestionRows'
 import { TransactionFilters } from './TransactionFilters'
-import { TransactionTable } from './TransactionTable'
+import { TABLE_ROW_HEIGHT, TransactionTable } from './TransactionTable'
 import { SuggestionsPanel } from './SuggestionsPanel'
 import {
   DEFAULT_TRANSACTION_SORT,
@@ -86,11 +86,12 @@ export function TransactionsPage() {
   })
 
   const totalElements = listQuery.data?.totalElements ?? 0
-  const { containerRef, rows: rowsPerPage } = useFittingRows(totalElements, {
+  const { containerRef, rows: rowsPerPage, rowHeight } = useFittingRows(totalElements, {
     rowSelector: 'tbody tr',
     reservedSelector: 'thead',
     paginationSelector: '.MuiTablePagination-root',
     paginationHeight: PAGINATION_HEIGHT,
+    naturalRowHeight: TABLE_ROW_HEIGHT,
   })
 
   useEffect(() => {
@@ -277,6 +278,7 @@ export function TransactionsPage() {
             onSortChange={changeSort}
             containerRef={containerRef}
             rowsPerPage={rowsPerPage}
+            rowHeight={rowHeight}
             page={page}
             onPageChange={setPage}
             suggestionIds={suggestionIds}
