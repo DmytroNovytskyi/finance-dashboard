@@ -24,7 +24,12 @@ export interface TxFilters {
 
 export const emptyFilters: TxFilters = { uncategorized: false, q: '' }
 
-const NATURES: TransactionNature[] = ['INCOME', 'EXPENSE', 'TRANSFER', 'REFUND']
+/**
+ * The natures a filter may carry, which are the ones the filter bar offers. Linked transfers and
+ * refunds are reached through the Category filter instead, so accepting their natures here would
+ * let a hand-written link filter the list by a value the bar cannot show or clear.
+ */
+const NATURES: TransactionNature[] = ['INCOME', 'EXPENSE']
 
 /** Initial filters read from the URL (used for overview and suggestion drill-down links). */
 export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
