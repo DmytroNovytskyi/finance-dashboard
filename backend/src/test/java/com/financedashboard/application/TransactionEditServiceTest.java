@@ -70,11 +70,19 @@ class TransactionEditServiceTest {
         return BankStatement.builder().id(id).accountId(id).bank("PEKAO").fileHash("h-" + id).build();
     }
 
+    private static Category category(Long id, String name) {
+        return Category.builder().id(id).name(name).build();
+    }
+
+    private static Category reservedCategory(Long id, String name, String systemKey) {
+        return Category.builder().id(id).name(name).system(true).systemKey(systemKey).build();
+    }
+
     @Test
     void categorizeAssignsCategory() {
         Transaction current = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.EXPENSE);
         when(transactions.findById(1L)).thenReturn(Optional.of(current));
-        when(categories.existsById(5L)).thenReturn(true);
+        when(categories.findById(5L)).thenReturn(Optional.of(category(5L, "Groceries")));
         when(transactions.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         Transaction updated = service.categorize(1L, true, 5L, null);
@@ -102,12 +110,73 @@ class TransactionEditServiceTest {
     }
 
     @Test
+    void categorizeRejectsAReservedCategory() {
+        Transaction current = transaction(1L, 1L, new BigDecimal("-49.99"), TransactionNature.EXPENSE);
+        when(transactions.findById(1L)).thenReturn(Optional.of(current));
+        when(categories.findById(13L))
+                .thenReturn(Optional.of(reservedCategory(13L, "Refund", Category.SYSTEM_KEY_REFUND)));
+
+        assertThatThrownBy(() -> service.categorize(1L, true, 13L, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+        verify(transactions, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void categorizeRejectsACategoryChangeOnALinkedRow() {
+        Transaction leg = transaction(1L, 1L, new BigDecimal("-49.99"), TransactionNature.REFUND)
+                .toBuilder().refundGroupId(UUID.randomUUID()).categoryId(13L).build();
+        when(transactions.findById(1L)).thenReturn(Optional.of(leg));
+
+        assertThatThrownBy(() -> service.categorize(1L, true, 5L, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unlink");
+        verify(transactions, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void categorizeRejectsANatureChangeOnALinkedRow() {
+        Transaction leg = transaction(1L, 1L, new BigDecimal("-49.99"), TransactionNature.REFUND)
+                .toBuilder().refundGroupId(UUID.randomUUID()).categoryId(13L).build();
+        when(transactions.findById(1L)).thenReturn(Optional.of(leg));
+
+        assertThatThrownBy(() -> service.categorize(1L, false, null, TransactionNature.EXPENSE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unlink");
+        verify(transactions, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
     void categorizeBulkRejectsUnknownCategory() {
-        when(categories.existsById(99L)).thenReturn(false);
+        when(categories.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.categorizeBulk(java.util.List.of(1L), 99L))
                 .isInstanceOf(com.financedashboard.application.exception.NotFoundException.class);
         verify(transactions, org.mockito.Mockito.never()).findById(any());
+    }
+
+    @Test
+    void categorizeBulkRejectsAReservedCategory() {
+        when(categories.findById(6L)).thenReturn(
+                Optional.of(reservedCategory(6L, "Internal Transfer", Category.SYSTEM_KEY_TRANSFER)));
+
+        assertThatThrownBy(() -> service.categorizeBulk(java.util.List.of(1L), 6L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+        verify(transactions, org.mockito.Mockito.never()).findById(any());
+    }
+
+    @Test
+    void categorizeBulkRejectsALinkedRowInTheSelection() {
+        Transaction leg = transaction(1L, 1L, new BigDecimal("-10"), TransactionNature.TRANSFER)
+                .toBuilder().transferGroupId(UUID.randomUUID()).categoryId(6L).build();
+        when(categories.findById(5L)).thenReturn(Optional.of(category(5L, "Groceries")));
+        when(transactions.findById(1L)).thenReturn(Optional.of(leg));
+
+        assertThatThrownBy(() -> service.categorizeBulk(java.util.List.of(1L), 5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unlink");
+        verify(transactions, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
@@ -235,6 +304,7 @@ class TransactionEditServiceTest {
                 .toBuilder().categoryId(9L).build();
         when(transactions.findCategorized()).thenReturn(List.of(inTarget, other));
         when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(categories.findById(5L)).thenReturn(Optional.of(category(5L, "Groceries")));
 
         int cleared = service.uncategorizeByCategory(5L);
 
@@ -244,6 +314,17 @@ class TransactionEditServiceTest {
                 org.mockito.ArgumentCaptor.forClass(List.class);
         verify(transactions).saveAll(captor.capture());
         assertThat(captor.getValue()).extracting(Transaction::getId).containsExactly(1L);
+    }
+
+    @Test
+    void uncategorizeByCategoryRejectsAReservedCategory() {
+        when(categories.findById(6L)).thenReturn(
+                Optional.of(reservedCategory(6L, "Internal Transfer", Category.SYSTEM_KEY_TRANSFER)));
+
+        assertThatThrownBy(() -> service.uncategorizeByCategory(6L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+        verify(transactions, org.mockito.Mockito.never()).findCategorized();
     }
 
     @Test

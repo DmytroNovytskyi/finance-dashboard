@@ -83,6 +83,16 @@ class CategoryApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void uncategorizeRefusesAReservedCategory() throws Exception {
+        long categoryId = jdbcTemplate.queryForObject("""
+                insert into category (name, system, system_key) values ('Refund', true, 'REFUND') returning id
+                """, Long.class);
+
+        mockMvc.perform(post("/api/v1/categories/{id}/uncategorize", categoryId))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteCategoryRemovesIt() throws Exception {
         long id = createCategory("Dining", "#FF9800");
 

@@ -35,6 +35,12 @@ class TransactionEditApiTest extends AbstractIntegrationTest {
                 """, Long.class, name);
     }
 
+    private long createSystemCategory(String name, String systemKey) {
+        return jdbcTemplate.queryForObject("""
+                insert into category (name, system, system_key) values (?, true, ?) returning id
+                """, Long.class, name, systemKey);
+    }
+
     private long insertTransaction(long statementId, long accountId, LocalDate date,
                                    String amount, String currency, String nature, String description) {
         return jdbcTemplate.queryForObject("""
@@ -90,6 +96,81 @@ class TransactionEditApiTest extends AbstractIntegrationTest {
                                 {"nature": "TRANSFER"}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void patchRefusesAReservedCategory() throws Exception {
+        long accountId = createAccount("PLN");
+        long statementId = createStatement(accountId, "h-reserved");
+        long tx = insertTransaction(statementId, accountId, LocalDate.of(2026, 8, 21),
+                "-49.99", "PLN", "EXPENSE", "Example Shop");
+        long refundCategoryId = createSystemCategory("Refund", "REFUND");
+
+        mockMvc.perform(patch("/api/v1/transactions/{id}", tx)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"categoryId": %d}
+                                """.formatted(refundCategoryId)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select category_id from transaction where id = ?", Long.class, tx)).isNull();
+    }
+
+    @Test
+    void bulkRefusesAReservedCategory() throws Exception {
+        long accountId = createAccount("PLN");
+        long statementId = createStatement(accountId, "h-reserved-bulk");
+        long tx = insertTransaction(statementId, accountId, LocalDate.of(2026, 8, 21),
+                "-49.99", "PLN", "EXPENSE", "Example Shop");
+        long transferCategoryId = createSystemCategory("Internal Transfer", "TRANSFER");
+
+        mockMvc.perform(post("/api/v1/transactions/categorize")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"transactionIds": [%d], "categoryId": %d}
+                                """.formatted(tx, transferCategoryId)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select category_id from transaction where id = ?", Long.class, tx)).isNull();
+    }
+
+    @Test
+    void patchRefusesAnEditOfALinkedRow() throws Exception {
+        long accountA = createAccount("PLN");
+        long accountB = createAccount("USD");
+        long statementA = createStatement(accountA, "h-linked-a");
+        long statementB = createStatement(accountB, "h-linked-b");
+        long legA = insertTransaction(statementA, accountA, LocalDate.of(2026, 8, 21),
+                "-100.00", "PLN", "EXPENSE", "to USD");
+        long legB = insertTransaction(statementB, accountB, LocalDate.of(2026, 8, 21),
+                "80.00", "USD", "INCOME", "from PLN");
+        long categoryId = createCategory("Food");
+
+        mockMvc.perform(post("/api/v1/transfers")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"fromTransactionId": %d, "toTransactionId": %d}
+                                """.formatted(legA, legB)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(patch("/api/v1/transactions/{id}", legA)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"categoryId": %d}
+                                """.formatted(categoryId)))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/v1/transactions/{id}", legA)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"nature": "EXPENSE"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select nature from transaction where id = ?", String.class, legA)).isEqualTo("TRANSFER");
     }
 
     @Test

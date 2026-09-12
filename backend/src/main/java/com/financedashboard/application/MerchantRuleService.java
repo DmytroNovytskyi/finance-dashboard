@@ -45,14 +45,18 @@ public class MerchantRuleService {
                 .toList();
     }
 
-    /** Creates a rule for the normalized merchant and category; duplicates are rejected. */
+    /**
+     * Creates a rule for the normalized merchant and category; duplicates are rejected. A reserved
+     * category is refused: a default tagging rows with one would dress every match up as a linked
+     * leg that no pairing flow ever created, and it would do so in bulk on the next apply.
+     */
     @Transactional
     public RuleDetail create(String merchant, Long categoryId) {
         String key = normalize(merchant);
         if (key.isEmpty()) {
             throw new IllegalArgumentException("merchant must not be blank");
         }
-        requireCategory(categoryId);
+        Category category = requireAssignableCategory(categoryId);
         if (rules.existsByMerchant(key)) {
             throw new IllegalArgumentException("A default for merchant '" + key + "' already exists");
         }
@@ -60,7 +64,7 @@ public class MerchantRuleService {
                 .merchant(key)
                 .categoryId(categoryId)
                 .build());
-        return detail(saved, categories.findById(categoryId).orElseThrow());
+        return detail(saved, category);
     }
 
     /**
@@ -187,10 +191,18 @@ public class MerchantRuleService {
         return merchant == null ? "" : merchant.trim().toUpperCase().replaceAll("\\s+", " ");
     }
 
-    private void requireCategory(Long categoryId) {
-        if (!categories.existsById(categoryId)) {
-            throw new NotFoundException("Category " + categoryId + " not found");
+    /**
+     * Returns the category with the given id, refusing the reserved ones: a default pointing at one
+     * would tag every matching transaction the way the pairing flows do, with no pair behind it.
+     */
+    private Category requireAssignableCategory(Long categoryId) {
+        Category category = categories.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Category " + categoryId + " not found"));
+        if (category.isSystem()) {
+            throw new IllegalArgumentException("Category '" + category.getName()
+                    + "' is reserved and cannot be set as a default; link the transactions instead");
         }
+        return category;
     }
 
     private static RuleDetail detail(MerchantRule rule, Category category) {

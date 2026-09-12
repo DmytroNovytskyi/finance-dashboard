@@ -34,7 +34,10 @@ public class TransactionEditService {
 
     /**
      * Applies a category and/or nature to one transaction. When {@code categorySpecified} the
-     * transaction's category is set to {@code categoryId} (a null value clears it).
+     * transaction's category is set to {@code categoryId} (a null value clears it). A reserved
+     * category is refused, and so is any edit of a transaction that is already paired: the pairing
+     * flows own both. A transaction left holding a reserved category without being paired would be
+     * read as a linked leg while still counting towards the statistics.
      */
     @Transactional
     public Transaction categorize(Long id, boolean categorySpecified, Long categoryId, TransactionNature nature) {
@@ -45,8 +48,9 @@ public class TransactionEditService {
             throw new IllegalArgumentException("Set REFUND through the refunds endpoint");
         }
         Transaction current = get(id);
+        requireUnpaired(current, categorySpecified || nature != null);
         if (categorySpecified && categoryId != null) {
-            requireCategory(categoryId);
+            requireAssignableCategory(categoryId);
         }
         Transaction updated = current.toBuilder()
                 .categoryId(categorySpecified ? categoryId : current.getCategoryId())
@@ -55,14 +59,19 @@ public class TransactionEditService {
         return transactions.save(updated);
     }
 
-    /** Assigns {@code categoryId} (null = uncategorized) to all the given transactions. */
+    /**
+     * Assigns {@code categoryId} (null = uncategorized) to all the given transactions. A reserved
+     * category is refused, as is a paired transaction — one such row fails the whole call rather
+     * than being skipped silently.
+     */
     @Transactional
     public void categorizeBulk(List<Long> ids, Long categoryId) {
         if (categoryId != null) {
-            requireCategory(categoryId);
+            requireAssignableCategory(categoryId);
         }
         for (Long id : ids) {
             Transaction current = get(id);
+            requireUnpaired(current, true);
             transactions.save(current.toBuilder().categoryId(categoryId).build());
         }
     }
@@ -84,10 +93,12 @@ public class TransactionEditService {
 
     /**
      * Clears the category of the transactions tagged with the given category, without deleting the
-     * category. Internal transfers (which keep their reserved tag) are untouched.
+     * category. A reserved category is refused rather than cleared: that tag is what marks a
+     * transfer or refund as linked, so clearing it would leave the pair behind without its label.
      */
     @Transactional
     public int uncategorizeByCategory(Long categoryId) {
+        requireAssignableCategory(categoryId);
         List<Transaction> cleared = transactions.findCategorized().stream()
                 .filter(transaction -> categoryId.equals(transaction.getCategoryId()))
                 .map(transaction -> transaction.toBuilder().categoryId(null).build())
@@ -392,9 +403,27 @@ public class TransactionEditService {
                 .orElseThrow(() -> new NotFoundException("Transaction " + id + " not found"));
     }
 
-    private void requireCategory(Long categoryId) {
-        if (!categories.existsById(categoryId)) {
-            throw new NotFoundException("Category " + categoryId + " not found");
+    /**
+     * Refuses a reserved category. Those are attached by the pairing flows alone; assigned by hand
+     * they leave a transaction looking linked while it counts towards the statistics like any other.
+     */
+    private void requireAssignableCategory(Long categoryId) {
+        Category category = categories.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Category " + categoryId + " not found"));
+        if (category.isSystem()) {
+            throw new IllegalArgumentException("Category '" + category.getName()
+                    + "' is reserved and cannot be assigned by hand; link the transactions instead");
+        }
+    }
+
+    /**
+     * Refuses an edit that would break a pair apart. A linked transfer or refund is held together
+     * by its group id, its reserved category and its nature, so those change only by unlinking.
+     */
+    private static void requireUnpaired(Transaction transaction, boolean editing) {
+        if (editing && isPaired(transaction)) {
+            throw new IllegalArgumentException("Transaction " + transaction.getId()
+                    + " is linked to a transfer or refund; unlink it before editing");
         }
     }
 }

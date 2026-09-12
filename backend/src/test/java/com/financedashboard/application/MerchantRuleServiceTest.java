@@ -49,7 +49,6 @@ class MerchantRuleServiceTest {
 
     @Test
     void createNormalizesMerchantAndResolvesCategory() {
-        when(categories.existsById(CATEGORY)).thenReturn(true);
         when(rules.existsByMerchant("EXAMPLE MERCHANT")).thenReturn(false);
         when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
         when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -69,14 +68,25 @@ class MerchantRuleServiceTest {
 
     @Test
     void createRejectsUnknownCategory() {
-        when(categories.existsById(CATEGORY)).thenReturn(false);
+        when(categories.findById(CATEGORY)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.create("Merchant", CATEGORY))
                 .isInstanceOf(NotFoundException.class);
     }
 
     @Test
+    void createRejectsAReservedCategory() {
+        when(categories.findById(CATEGORY)).thenReturn(Optional.of(Category.builder()
+                .id(CATEGORY).name("Refund").system(true).systemKey("REFUND").build()));
+
+        assertThatThrownBy(() -> service.create("EXAMPLE SHOP", CATEGORY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+        verify(rules, never()).save(any());
+    }
+
+    @Test
     void createRejectsDuplicateMerchant() {
-        when(categories.existsById(CATEGORY)).thenReturn(true);
+        when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
         when(rules.existsByMerchant("EXAMPLE MERCHANT")).thenReturn(true);
         assertThatThrownBy(() -> service.create("example merchant", CATEGORY))
                 .isInstanceOf(IllegalArgumentException.class);
