@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link as RouterLink, NavLink, Outlet, useLocation } from 'react-router-dom'
 import AccountBalanceWallet from '@mui/icons-material/AccountBalanceWallet'
 import AccountBox from '@mui/icons-material/AccountBox'
 import Dashboard from '@mui/icons-material/Dashboard'
@@ -64,9 +64,7 @@ export function AppShell() {
           {!isMobile ? (
             <Toolbar sx={{ gap: 1.5, px: 2 }}>
               <AccountBalanceWallet color="primary" sx={{ flexShrink: 0 }} />
-              <Typography variant="h6" sx={{ whiteSpace: 'nowrap' }}>
-                Finance Dashboard
-              </Typography>
+              <AppTitle />
             </Toolbar>
           ) : null}
           <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
@@ -92,9 +90,7 @@ export function AppShell() {
               <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
                 <Menu />
               </IconButton>
-              <Typography variant="h6" noWrap>
-                Finance Dashboard
-              </Typography>
+              <AppTitle />
             </Toolbar>
           </AppBar>
         ) : null}
@@ -115,6 +111,25 @@ export function AppShell() {
         </Box>
       </Box>
     </Box>
+  )
+}
+
+/** The app title, which doubles as the way back to the overview from any page. */
+function AppTitle() {
+  return (
+    <Typography
+      component={RouterLink}
+      to="/"
+      variant="h6"
+      sx={{
+        color: 'inherit',
+        textDecoration: 'none',
+        whiteSpace: 'nowrap',
+        '&:hover': { color: 'primary.main' },
+      }}
+    >
+      Finance Dashboard
+    </Typography>
   )
 }
 
