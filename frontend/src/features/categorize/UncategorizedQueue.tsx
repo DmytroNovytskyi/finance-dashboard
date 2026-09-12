@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
@@ -7,6 +7,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
+import Snackbar from '@mui/material/Snackbar'
 import ToggleButton from '@mui/material/ToggleButton'
 import TablePagination from '@mui/material/TablePagination'
 import TextField from '@mui/material/TextField'
@@ -18,6 +19,8 @@ import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
 import type { Transaction } from '../../types'
+import { LinkButtons } from '../transactions/LinkActions'
+import { useLinking } from '../transactions/useLinking'
 import {
   QUEUE_SIZE,
   useCategorizeBulk,
@@ -65,6 +68,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [sort, setSort] = useState<QueueSort>('newest')
+  const [notice, setNotice] = useState<string | null>(null)
   const queue = useUncategorizedQueue(nature, appliedSearch, sort)
   const categorizeOne = useCategorizeOne()
   const categorizeBulk = useCategorizeBulk()
@@ -73,6 +77,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
 
   const rows = queue.data?.content ?? []
   const total = queue.data?.totalElements ?? 0
+  const assignable = useMemo(() => categories.filter((category) => !category.system), [categories])
   const [page, setPage] = useState(0)
   const { containerRef, container, rows: perPage, rowHeight } = useFittingRows(rows.length, {
     rowSelector: '[data-row]',
@@ -102,6 +107,12 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [search])
+
+  const linking = useLinking({
+    onNotice: setNotice,
+    onLinked: () => setSelected(new Set()),
+  })
+  const selectedRows = rows.filter((row) => selected.has(row.id))
 
   const single = selected.size === 1 ? rows.find((row) => selected.has(row.id)) : undefined
   const merchant = single?.merchant ?? null
@@ -238,12 +249,18 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
               renderValue={() => 'Assign category…'}
               sx={{ minWidth: 200 }}
             >
-              {categories.map((category) => (
+              {assignable.map((category) => (
                 <MenuItem key={category.id} value={String(category.id)}>
                   {category.name}
                 </MenuItem>
               ))}
             </Select>
+            <LinkButtons
+              selected={selectedRows}
+              busy={linking.busy}
+              onLinkRefund={linking.linkRefund}
+              onLinkTransfer={linking.linkTransfer}
+            />
             <Button size="small" onClick={() => setSelected(new Set())}>
               Clear
             </Button>
@@ -328,7 +345,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
                 sx={{ minWidth: 44, '.MuiSelect-select': { py: 0.75 } }}
                 inputProps={{ 'aria-label': 'Assign category' }}
               >
-                {categories.map((category) => (
+                {assignable.map((category) => (
                   <MenuItem key={category.id} value={String(category.id)}>
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
                       <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: category.color, display: 'inline-block' }} />
@@ -360,6 +377,13 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
           Showing the first {QUEUE_SIZE} of {total}; use the Transactions page to filter the rest.
         </Typography>
       ) : null}
+
+      <Snackbar
+        open={notice !== null}
+        autoHideDuration={4000}
+        onClose={() => setNotice(null)}
+        message={notice}
+      />
     </Paper>
   )
 }

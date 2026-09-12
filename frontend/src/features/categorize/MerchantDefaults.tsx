@@ -51,6 +51,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
 
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedCategory = categoryId !== '' ? categoryById.get(Number(categoryId)) : undefined
+  const assignable = useMemo(() => categories.filter((category) => !category.system), [categories])
 
   const orderedRules = useMemo(() => {
     const nameOf = (rule: MerchantRule) =>
@@ -212,7 +213,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           renderValue={() => selectedCategory?.name ?? 'Category…'}
           sx={{ minWidth: 150 }}
         >
-          {categories.map((category) => (
+          {assignable.map((category) => (
             <MenuItem key={category.id} value={String(category.id)}>
               {category.name}
             </MenuItem>

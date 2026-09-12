@@ -13,6 +13,14 @@ interface LinkActionsProps {
   onClear: () => void
 }
 
+/** The two pairing buttons alone, for a bar that already has a selection count and a clear. */
+interface LinkButtonsProps {
+  selected: Transaction[]
+  busy: boolean
+  onLinkRefund: (purchaseId: number, refundIds: number[]) => void
+  onLinkTransfer: (fromId: number, toId: number) => void
+}
+
 /** What a selection has to look like to become a refund, or the reason it cannot. */
 interface RefundShape {
   purchase: Transaction
@@ -80,33 +88,18 @@ function transferShape(selected: Transaction[]): TransferShape | string {
 }
 
 /**
- * Bar shown over the transactions table while rows are selected in edit mode. It reads the
- * selection by sign rather than asking which row is which, and explains on hover why an action is
- * unavailable.
+ * The pairing buttons, disabled by the shape of the selection and explaining on hover why an
+ * action is unavailable. Shared by every bar that offers linking, so a selection is judged in one
+ * place however it was made.
  */
-export function LinkActions({ selected, busy, onLinkRefund, onLinkTransfer, onClear }: LinkActionsProps) {
+export function LinkButtons({ selected, busy, onLinkRefund, onLinkTransfer }: LinkButtonsProps) {
   const refund = refundShape(selected)
   const transfer = transferShape(selected)
   const refundReady = typeof refund !== 'string'
   const transferReady = typeof transfer !== 'string'
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        px: 2,
-        py: 1,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        flexWrap: 'wrap',
-        bgcolor: 'action.selected',
-      }}
-    >
-      <Typography variant="body2" sx={{ mr: 'auto' }}>
-        {selected.length} selected
-      </Typography>
-
+    <>
       <Tooltip title={refundReady ? 'Link the expense as the purchase and the incomes as its credits' : refund}>
         <span>
           <Button
@@ -141,6 +134,35 @@ export function LinkActions({ selected, busy, onLinkRefund, onLinkTransfer, onCl
           </Button>
         </span>
       </Tooltip>
+    </>
+  )
+}
+
+/** Bar shown over the transactions table while rows are selected in edit mode. */
+export function LinkActions({ selected, busy, onLinkRefund, onLinkTransfer, onClear }: LinkActionsProps) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        px: 2,
+        py: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        flexWrap: 'wrap',
+        bgcolor: 'action.selected',
+      }}
+    >
+      <Typography variant="body2" sx={{ mr: 'auto' }}>
+        {selected.length} selected
+      </Typography>
+
+      <LinkButtons
+        selected={selected}
+        busy={busy}
+        onLinkRefund={onLinkRefund}
+        onLinkTransfer={onLinkTransfer}
+      />
 
       <Button size="small" onClick={onClear}>
         Clear
