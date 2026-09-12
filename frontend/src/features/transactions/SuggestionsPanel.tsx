@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import Paper from '@mui/material/Paper'
 import TablePagination from '@mui/material/TablePagination'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 import { useFittingRows } from '../../hooks/useFittingRows'
@@ -11,24 +13,33 @@ import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 /** Unstretched height of one suggestion row, which is a single truncated line. */
 const SUGGESTION_ROW_HEIGHT = 40
 
+/** Space between two rows; the list's row gap, kept here so the height below agrees with it. */
+const SUGGESTION_GAP = 4
+
 /**
- * What the list gives up for the bar, which is MUI's default toolbar height. Reserving less lets
- * the list and the bar together overrun the budget above by the difference the moment the bar
- * appears. Pinning the toolbar's min-height does not help: the bar's own content already sets its
- * height, so the override would be inert while the reservation stayed wrong.
+ * Height of the pagination bar, tightened from MUI's 52. The list above it is sized from the rows
+ * asked for rather than measured against the bar, so this only shortens the card — and the card has
+ * to give those pixels back: three working lists sit below it on the categorize page, and at a
+ * 864px window the pair of panels is within a few pixels of what that page can spare.
  */
-const PAGINATION_HEIGHT = 52
+const PAGINATION_HEIGHT = 44
 
 /**
  * The list is a fixed slice of the page rather than a content-sized box. That matters: the row
  * count comes from measuring this element, so a content-sized one would shrink to whatever it last
- * rendered and never grow back past a single row.
+ * rendered and never grow back past a single row. The height is exactly the rows asked for, so the
+ * list ends where the last row does rather than leaving a gap under it.
  */
-const LIST_HEIGHT = `calc(min(280px, 26dvh) - ${PAGINATION_HEIGHT}px)`
+function listHeight(rows: number): string {
+  return `${rows * SUGGESTION_ROW_HEIGHT + (rows - 1) * SUGGESTION_GAP}px`
+}
 
 interface SuggestionsPanelProps<T> {
   title: string
-  subtitle: string
+  /** What the suggestions mean, shown on demand: as a tooltip it costs the row no height. */
+  hint: string
+  /** Rows one page may show. Callers pass fewer on a short window, where three would not fit. */
+  maxRows: number
   suggestions: T[]
   busy: boolean
   rowKey: (suggestion: T) => string
@@ -43,11 +54,13 @@ interface SuggestionsPanelProps<T> {
 /**
  * Pending auto-detected pairs of rows: review them and apply each one or all at once. Nothing is
  * linked until it is applied here. The list pages itself so a long backlog cannot stretch the card,
- * and clicking a row (rather than its Apply button) shows the transactions it refers to.
+ * and clicking a row (rather than its Apply button) shows the transactions it refers to. Two of
+ * these sit side by side, so the header keeps to one line and the explanation moved into a tooltip.
  */
 export function SuggestionsPanel<T>({
   title,
-  subtitle,
+  hint,
+  maxRows,
   suggestions,
   busy,
   rowKey,
@@ -60,6 +73,7 @@ export function SuggestionsPanel<T>({
   const { containerRef, container, rows: perPage } = useFittingRows(suggestions.length, {
     rowSelector: '[data-row]',
     naturalRowHeight: SUGGESTION_ROW_HEIGHT,
+    max: maxRows,
   })
   const maxPage = Math.max(0, Math.ceil(suggestions.length / perPage) - 1)
   const shownPage = Math.min(page, maxPage)
@@ -74,17 +88,22 @@ export function SuggestionsPanel<T>({
   })
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 3, px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h6" component="h3">
+    <Paper variant="outlined" sx={{ borderRadius: 3, px: 2.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+          <Typography variant="h6" component="h3" noWrap>
             {title}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {subtitle}
-          </Typography>
+          <Tooltip title={hint}>
+            <InfoOutlined fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0 }} />
+          </Tooltip>
         </Box>
-        <Button variant="outlined" onClick={onApplyAll} disabled={busy}>
+        <Button
+          variant="outlined"
+          onClick={onApplyAll}
+          disabled={busy}
+          sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+        >
           Apply all
         </Button>
       </Box>
@@ -93,8 +112,8 @@ export function SuggestionsPanel<T>({
         sx={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 0.5,
-          height: LIST_HEIGHT,
+          gap: `${SUGGESTION_GAP}px`,
+          height: listHeight(maxRows),
           overflowY: 'auto',
           overscrollBehaviorY: 'contain',
         }}
@@ -147,7 +166,7 @@ export function SuggestionsPanel<T>({
           rowsPerPage={perPage}
           rowsPerPageOptions={[]}
           labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
-          sx={{ flexShrink: 0 }}
+          sx={{ flexShrink: 0, '.MuiTablePagination-toolbar': { minHeight: PAGINATION_HEIGHT } }}
         />
       ) : null}
     </Paper>

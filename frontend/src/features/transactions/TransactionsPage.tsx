@@ -18,17 +18,18 @@ import { refundsApi, transactionsApi, transfersApi } from '../../api/endpoints'
 import { buildQuery } from '../../api/client'
 import { queryKeys } from '../../api/keys'
 import type { AccountPresentation } from '../../api/queries'
-import type { RefundSuggestion, Transaction, TransferSuggestion } from '../../types'
+import type { Transaction } from '../../types'
 import { PageHeader, PageShell } from '../../components/PageLayout'
 import { useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
+import { invalidatePairs } from './invalidatePairs'
 import { LinkActions } from './LinkActions'
 import { useFittingRows } from '../../hooks/useFittingRows'
 import { usePageOnWheel } from '../../hooks/usePageOnWheel'
-import { RefundSuggestionRow, TransferSuggestionRow } from './SuggestionRows'
+import { SuggestionsSections } from './SuggestionsSections'
+import { useLinking } from './useLinking'
 import { TransactionFilters } from './TransactionFilters'
 import { TABLE_ROW_HEIGHT, TransactionTable } from './TransactionTable'
-import { SuggestionsPanel } from './SuggestionsPanel'
 import {
   DEFAULT_TRANSACTION_SORT,
   emptyFilters,
@@ -152,23 +153,11 @@ export function TransactionsPage() {
 
   const categorizeOne = useCategorizeOne()
 
-  const invalidateAfterTransferAction = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.transfers })
-    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.root })
-    queryClient.invalidateQueries({ queryKey: queryKeys.statistics.root })
-  }
-  const applyAllMutation = useMutation({
-    mutationFn: () => transfersApi.applyAll(),
-    onSuccess: invalidateAfterTransferAction,
-  })
-  const applyOneMutation = useMutation({
-    mutationFn: (suggestion: TransferSuggestion) =>
-      transfersApi.pair(suggestion.fromTransactionId, suggestion.toTransactionId),
-    onSuccess: invalidateAfterTransferAction,
-  })
+  const invalidateAfterUnlink = () => invalidatePairs(queryClient)
+
   const unlinkMutation = useMutation({
     mutationFn: (id: number) => transfersApi.unlink(id),
-    onSuccess: invalidateAfterTransferAction,
+    onSuccess: invalidateAfterUnlink,
   })
 
   const refundSuggestionsQuery = useRefundSuggestions()
@@ -183,51 +172,16 @@ export function TransactionsPage() {
     return ids
   }, [refundSuggestionsQuery.data])
 
-  const invalidateAfterRefundAction = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.refunds })
-    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.root })
-    queryClient.invalidateQueries({ queryKey: queryKeys.statistics.root })
-  }
-  const applyAllRefundsMutation = useMutation({
-    mutationFn: () => refundsApi.applyAll(),
-    onSuccess: invalidateAfterRefundAction,
-  })
-  const applyRefundMutation = useMutation({
-    mutationFn: (suggestion: RefundSuggestion) =>
-      refundsApi.pair(suggestion.purchaseTransactionId, suggestion.refundTransactionIds),
-    onSuccess: invalidateAfterRefundAction,
-  })
   const unlinkRefundMutation = useMutation({
     mutationFn: (id: number) => refundsApi.unlink(id),
-    onSuccess: invalidateAfterRefundAction,
+    onSuccess: invalidateAfterUnlink,
   })
 
   const changeCategory = (id: number, categoryId: number | null) => categorizeOne.mutate({ id, categoryId })
 
-  const invalidateAfterLink = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.transfers })
-    queryClient.invalidateQueries({ queryKey: queryKeys.refunds })
-    queryClient.invalidateQueries({ queryKey: queryKeys.transactions.root })
-    queryClient.invalidateQueries({ queryKey: queryKeys.statistics.root })
-  }
-  const linkRefundMutation = useMutation({
-    mutationFn: ({ purchaseId, refundIds }: { purchaseId: number; refundIds: number[] }) =>
-      refundsApi.pair(purchaseId, refundIds),
-    onSuccess: (result) => {
-      invalidateAfterLink()
-      setSelected(new Map())
-      setSnackbar(`Linked ${result.refunds.length + 1} transactions as a refund.`)
-    },
-    onError: (error: Error) => setSnackbar(error.message),
-  })
-  const linkTransferMutation = useMutation({
-    mutationFn: ({ fromId, toId }: { fromId: number; toId: number }) => transfersApi.pair(fromId, toId),
-    onSuccess: () => {
-      invalidateAfterLink()
-      setSelected(new Map())
-      setSnackbar('Linked the two transactions as an internal transfer.')
-    },
-    onError: (error: Error) => setSnackbar(error.message),
+  const linking = useLinking({
+    onNotice: setSnackbar,
+    onLinked: () => setSelected(new Map()),
   })
 
   /**
@@ -286,45 +240,7 @@ export function TransactionsPage() {
         }
       />
 
-      {(suggestionsQuery.data?.length ?? 0) > 0 ? (
-        <SuggestionsPanel
-          title="Internal transfers"
-          subtitle={`${suggestionsQuery.data?.length ?? 0} ${
-            suggestionsQuery.data?.length === 1 ? 'pair' : 'pairs'
-          } that look like moves between your own accounts but are not internal transfers yet.`}
-          suggestions={suggestionsQuery.data ?? []}
-          busy={applyAllMutation.isPending || applyOneMutation.isPending}
-          rowKey={(suggestion) => `${suggestion.fromTransactionId}-${suggestion.toTransactionId}`}
-          renderRow={(suggestion) => (
-            <TransferSuggestionRow suggestion={suggestion} accounts={accountsById} />
-          )}
-          onApplyAll={() => applyAllMutation.mutate()}
-          onApply={(suggestion) => applyOneMutation.mutate(suggestion)}
-          onSelect={(suggestion) =>
-            showRows([suggestion.fromTransactionId, suggestion.toTransactionId])
-          }
-        />
-      ) : null}
-
-      {(refundSuggestionsQuery.data?.length ?? 0) > 0 ? (
-        <SuggestionsPanel
-          title="Refunds"
-          subtitle={`${refundSuggestionsQuery.data?.length ?? 0} ${
-            refundSuggestionsQuery.data?.length === 1 ? 'purchase' : 'purchases'
-          } that came back. Linking both legs takes them out of your spending and income.`}
-          suggestions={refundSuggestionsQuery.data ?? []}
-          busy={applyAllRefundsMutation.isPending || applyRefundMutation.isPending}
-          rowKey={(suggestion) => `${suggestion.purchaseTransactionId}-${suggestion.refundTransactionIds.join('.')}`}
-          renderRow={(suggestion) => (
-            <RefundSuggestionRow suggestion={suggestion} accounts={accountsById} />
-          )}
-          onApplyAll={() => applyAllRefundsMutation.mutate()}
-          onApply={(suggestion) => applyRefundMutation.mutate(suggestion)}
-          onSelect={(suggestion) =>
-            showRows([suggestion.purchaseTransactionId, ...suggestion.refundTransactionIds])
-          }
-        />
-      ) : null}
+      <SuggestionsSections onSelect={showRows} />
 
       <TransactionFilters
         filters={filters}
@@ -343,9 +259,9 @@ export function TransactionsPage() {
       {editMode && selected.size > 0 ? (
         <LinkActions
           selected={[...selected.values()]}
-          busy={linkRefundMutation.isPending || linkTransferMutation.isPending}
-          onLinkRefund={(purchaseId, refundIds) => linkRefundMutation.mutate({ purchaseId, refundIds })}
-          onLinkTransfer={(fromId, toId) => linkTransferMutation.mutate({ fromId, toId })}
+          busy={linking.busy}
+          onLinkRefund={linking.linkRefund}
+          onLinkTransfer={linking.linkTransfer}
           onClear={() => setSelected(new Map())}
         />
       ) : null}

@@ -1,6 +1,9 @@
+import { useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
+import { buildQuery } from '../../api/client'
 import { useCategories } from '../../api/queries'
 import { PageHeader, PageShell } from '../../components/PageLayout'
+import { SuggestionsSections } from '../transactions/SuggestionsSections'
 import { CategoryManager } from './CategoryManager'
 import { MerchantDefaults } from './MerchantDefaults'
 import { UncategorizedQueue } from './UncategorizedQueue'
@@ -8,12 +11,14 @@ import { UncategorizedQueue } from './UncategorizedQueue'
 /** Tag uncategorized transactions, manage categories, and set merchant defaults. */
 export function CategorizePage() {
   const categories = useCategories()
+  const navigate = useNavigate()
   return (
     <PageShell>
       <PageHeader
         title="Categorize"
         subtitle="Assign spending groups so the overview breakdown is meaningful."
       />
+      <SuggestionsSections onSelect={(ids) => navigate(`/transactions${buildQuery({ ids })}`)} />
       <Box
         sx={{
           display: 'flex',
