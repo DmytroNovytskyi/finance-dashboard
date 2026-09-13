@@ -130,7 +130,25 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
     })
   }
 
-  const assignOne = (id: number, categoryId: number) => categorizeOne.mutate({ id, categoryId })
+  /**
+   * A row that has been assigned a category has left the queue, so it cannot stay selected: the bar
+   * would go on counting a row the list no longer holds, and a lone selection would still offer to
+   * remember its merchant. The removal waits for the assignment to land, because a failed one
+   * leaves the row uncategorized — and therefore still legitimately selected.
+   */
+  const assignOne = (id: number, categoryId: number) =>
+    categorizeOne.mutate(
+      { id, categoryId },
+      {
+        onSuccess: () =>
+          setSelected((current) => {
+            if (!current.has(id)) return current
+            const next = new Map(current)
+            next.delete(id)
+            return next
+          }),
+      },
+    )
   const assignMany = (categoryId: number) => {
     if (selected.size === 0) return
     if (remember && merchant) {
