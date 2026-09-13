@@ -120,10 +120,16 @@ export function TransactionFilters({
       />
       {filters.merchant !== undefined || filters.withoutMerchant ? (
         <Chip
-          size="small"
           variant="outlined"
           label={filters.withoutMerchant ? 'No merchant' : `Merchant: ${filters.merchant}`}
           onDelete={() => patch({ merchant: undefined, withoutMerchant: undefined })}
+          sx={{
+            height: 40,
+            borderRadius: 2,
+            pl: 0.5,
+            '.MuiChip-label': { px: 1.5, fontSize: '0.9375rem' },
+            '.MuiChip-deleteIcon': { fontSize: 20, mr: 1 },
+          }}
         />
       ) : null}
       <Button size="small" onClick={onClear} disabled={!hasFilters(filters)}>
