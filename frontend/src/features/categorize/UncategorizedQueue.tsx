@@ -152,15 +152,26 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
           }),
       },
     )
+  /**
+   * The same rule for the whole selection: the rows leave the queue only once the bulk call lands,
+   * so a refused one keeps a selection the user can retry. The remembered counterparty is part of
+   * that intent and is cleared with the selection, not ahead of it.
+   */
   const assignMany = (categoryId: number) => {
     if (selected.size === 0) return
     if (remember && merchant) {
       createRule.mutate({ merchant, categoryId, matchType })
     }
-    categorizeBulk.mutate({ ids: [...selected.keys()], categoryId })
-    setSelected(new Map())
-    setRemember(false)
-    setMatchType('EQUALS')
+    categorizeBulk.mutate(
+      { ids: [...selected.keys()], categoryId },
+      {
+        onSuccess: () => {
+          setSelected(new Map())
+          setRemember(false)
+          setMatchType('EQUALS')
+        },
+      },
+    )
   }
 
   const selectPage = (checked: boolean) => {
