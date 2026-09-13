@@ -143,7 +143,8 @@ returns the same income/expense per time bucket (`day|week|month|quarter|year`) 
 views. Both accept the shared `displayCurrency` (selecting which stored per-transaction currency is
 summed) and 404 for an unknown category.
 
-Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}`,
+Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}` (drops the
+rule and reverts its rows, reporting the count the way unlink does),
 `POST /api/v1/merchant-rules/{id}/unlink` (keeps the rule, reverts its rows),
 `POST /api/v1/merchant-rules/{id}/apply` (one rule), and `POST /api/v1/merchant-rules/apply`
 (all rules). A rule maps a counterparty to a category, and `matchType` says how the two are

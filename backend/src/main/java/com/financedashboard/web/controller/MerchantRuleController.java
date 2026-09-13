@@ -58,10 +58,14 @@ public class MerchantRuleController {
         return new BulkCountResponse(rules.unlink(id));
     }
 
+    /**
+     * Deletes this default and clears it from the rows it tagged, which become uncategorized again.
+     * Reports how many rows that reverted, the way {@link #unlink(Long)} does, so the caller can
+     * tell the user what the deletion cost rather than only that it happened.
+     */
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        rules.delete(id);
+    public BulkCountResponse delete(@PathVariable Long id) {
+        return new BulkCountResponse(rules.delete(id));
     }
 
     /** Deletes every default and reverts the transactions it had auto-tagged. */

@@ -181,7 +181,7 @@ export const merchantRulesApi = {
   list: () => request<MerchantRule[]>('/merchant-rules'),
   create: (input: { merchant: string; categoryId: number; matchType: MatchType }) =>
     request<MerchantRule>('/merchant-rules', { method: 'POST', body: JSON.stringify(input) }),
-  remove: (id: number) => request<void>(`/merchant-rules/${id}`, { method: 'DELETE' }),
+  remove: (id: number) => request<{ count: number }>(`/merchant-rules/${id}`, { method: 'DELETE' }),
   unlink: (id: number) => request<{ count: number }>(`/merchant-rules/${id}/unlink`, { method: 'POST' }),
   clearAll: () =>
     request<{ rulesRemoved: number; transactionsUncategorized: number }>('/merchant-rules', { method: 'DELETE' }),

@@ -113,6 +113,18 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
     })
   }
 
+  /** The default is gone either way, so the count only ever qualifies what the deletion cost. */
+  const runRemove = (id: number, label: string) => {
+    remove.mutate(id, {
+      onSuccess: (result) =>
+        setNotice(
+          result.count === 0
+            ? `Deleted the default for ${label}.`
+            : `Deleted the default for ${label}, uncategorizing ${result.count} row${result.count === 1 ? '' : 's'}.`,
+        ),
+    })
+  }
+
   const mutationError = (create.error ?? applyOne.error ?? unlink.error ?? remove.error) as Error | null
 
   return (
@@ -265,7 +277,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
             onClick={() => {
               if (confirmDelete) {
                 const { id, merchant: name } = confirmDelete
-                remove.mutate(id, { onSuccess: () => setNotice(`Deleted the default for ${name}.`) })
+                runRemove(id, name)
               }
               setConfirmDelete(null)
             }}
