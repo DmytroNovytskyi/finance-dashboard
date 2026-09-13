@@ -20,12 +20,11 @@ export function useLinking({ onNotice, onLinked }: LinkingOptions) {
   const invalidate = () => invalidatePairs(queryClient)
 
   const linkRefund = useMutation({
-    mutationFn: ({ purchaseId, refundIds }: { purchaseId: number; refundIds: number[] }) =>
-      refundsApi.pair(purchaseId, refundIds),
+    mutationFn: (ids: number[]) => refundsApi.pair(ids),
     onSuccess: (result) => {
       invalidate()
       onLinked()
-      onNotice(`Linked ${result.refunds.length + 1} transactions as a refund.`)
+      onNotice(`Linked ${result.transactions.length} transactions as a refund.`)
     },
     onError: (error: Error) => onNotice(error.message),
   })
@@ -41,8 +40,7 @@ export function useLinking({ onNotice, onLinked }: LinkingOptions) {
   })
 
   return {
-    linkRefund: (purchaseId: number, refundIds: number[]) =>
-      linkRefund.mutate({ purchaseId, refundIds }),
+    linkRefund: (ids: number[]) => linkRefund.mutate(ids),
     linkTransfer: (fromId: number, toId: number) => linkTransfer.mutate({ fromId, toId }),
     busy: linkRefund.isPending || linkTransfer.isPending,
   }

@@ -256,11 +256,11 @@ class RefundSuggestionServiceTest {
         Transaction secondRefund = income(4L, 1L, "70.00", "2026-06-01", "ZA ZWROT TRANSAKCJI Nr ref.: 2");
         when(transactions.findAllStatistical())
                 .thenReturn(List.of(firstPurchase, secondPurchase, firstRefund, secondRefund));
-        when(edit.pairRefund(1L, List.of(3L))).thenThrow(new IllegalArgumentException("already paired"));
-        when(edit.pairRefund(2L, List.of(4L))).thenReturn(List.of());
+        when(edit.pairRefund(List.of(1L, 3L))).thenThrow(new IllegalArgumentException("already paired"));
+        when(edit.pairRefund(List.of(2L, 4L))).thenReturn(List.of());
 
         assertThat(service.apply(edit)).isEqualTo(1);
-        verify(edit).pairRefund(2L, List.of(4L));
+        verify(edit).pairRefund(List.of(2L, 4L));
     }
 
     private static Transaction expense(long id, long accountId, String amount, String date,

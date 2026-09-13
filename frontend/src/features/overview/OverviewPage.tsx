@@ -11,63 +11,51 @@ import Typography from '@mui/material/Typography'
 import { queryKeys } from '../../api/keys'
 import { statisticsApi } from '../../api/endpoints'
 import { buildQuery } from '../../api/client'
-import { DATE_RANGE_PRESETS, rangeForPreset, type DateRange, type DateRangePreset } from '../../lib/date'
+import type { DateRange } from '../../lib/date'
 import { amountColor, useScheme } from '../../theme'
 import { formatInteger, formatMoney, formatMoneyMagnitude, formatTrendBucket } from '../../lib/format'
 import { ChartCard } from '../../components/ChartCard'
 import { PageHeader, PageScroll, PageShell } from '../../components/PageLayout'
+import { SeriesLegend } from '../../components/SeriesLegend'
 import { StatementFreshness } from '../../components/StatementFreshness'
 import type { StatisticsGranularity, StatisticsTrendPoint, TransactionNature } from '../../types'
 import { CategoryDonut, type DonutRow } from './CategoryDonut'
+import { MetricToggle, type Direction } from './MetricToggle'
 import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
+import {
+  useStatisticsPreferences,
+  type PeriodSelection,
+  type TrendGranularity,
+} from '../preferences/statisticsPreferences'
 import { PeriodSelector } from './PeriodSelector'
 import { TopMerchantsChart } from './TopMerchantsChart'
-import { TREND_GRANULARITIES, TrendChart, TrendControls } from './TrendChart'
+import { TrendChart } from './TrendChart'
 
 const OVERVIEW_STORAGE_KEY = 'finance-dashboard.overview.v1'
-const PRESET_VALUES: DateRangePreset[] = [...DATE_RANGE_PRESETS.map((option) => option.value), 'custom']
-const DEFAULT_PERIOD: PeriodState = { preset: 'thisYear', range: rangeForPreset('thisYear') }
-const DEFAULT_GRANULARITY: StatisticsGranularity = 'month'
 
-interface PeriodState {
-  preset: DateRangePreset
-  range: DateRange
-}
+/** The label the statistics give the rows they could not attribute to any merchant. */
+const NO_MERCHANT = '(no merchant)'
+
+const DEFAULT_DIRECTION: Direction = 'expense'
 
 interface StoredOverviewState {
-  preset?: unknown
-  from?: unknown
-  to?: unknown
-  granularity?: unknown
+  categoryMetric?: unknown
+  merchantMetric?: unknown
 }
 
-/** Restores the last period and granularity from the browser; currency is shared app-wide. */
-function loadOverviewState(): { period: PeriodState; granularity: StatisticsGranularity } {
-  const fallback = { period: DEFAULT_PERIOD, granularity: DEFAULT_GRANULARITY }
+/**
+ * Restores which side each card of the breakdown row is showing. The period and the granularity are
+ * not stored here: both statistics pages share them through {@link useStatisticsPreferences}.
+ */
+function loadOverviewState(): { categoryMetric: Direction; merchantMetric: Direction } {
+  const fallback = { categoryMetric: DEFAULT_DIRECTION, merchantMetric: DEFAULT_DIRECTION }
   try {
     const raw = window.localStorage.getItem(OVERVIEW_STORAGE_KEY)
     if (!raw) return fallback
     const stored = JSON.parse(raw) as StoredOverviewState
-    const granularity =
-      typeof stored.granularity === 'string' &&
-      (TREND_GRANULARITIES as readonly string[]).includes(stored.granularity)
-        ? (stored.granularity as StatisticsGranularity)
-        : DEFAULT_GRANULARITY
-    if (typeof stored.preset !== 'string' || !PRESET_VALUES.includes(stored.preset as DateRangePreset)) {
-      return { period: DEFAULT_PERIOD, granularity }
-    }
-    const preset = stored.preset as DateRangePreset
-    const period: PeriodState =
-      preset === 'custom'
-        ? {
-            preset,
-            range: {
-              from: typeof stored.from === 'string' ? stored.from : null,
-              to: typeof stored.to === 'string' ? stored.to : null,
-            },
-          }
-        : { preset, range: rangeForPreset(preset) }
-    return { period, granularity }
+    const read = (value: unknown): Direction =>
+      value === 'expense' || value === 'income' ? value : DEFAULT_DIRECTION
+    return { categoryMetric: read(stored.categoryMetric), merchantMetric: read(stored.merchantMetric) }
   } catch {
     return fallback
   }
@@ -126,15 +114,16 @@ export function OverviewPage() {
   const scheme = useScheme()
   const navigate = useNavigate()
   const { displayCurrency } = useDisplayCurrency()
-  const [period, setPeriod] = useState<PeriodState>(() => loadOverviewState().period)
-  const [granularity, setGranularity] = useState<StatisticsGranularity>(() => loadOverviewState().granularity)
+  const { period, granularity, setPeriod, setGranularity } = useStatisticsPreferences()
+  const [categoryMetric, setCategoryMetric] = useState<Direction>(() => loadOverviewState().categoryMetric)
+  const [merchantMetric, setMerchantMetric] = useState<Direction>(() => loadOverviewState().merchantMetric)
   const [focus, setFocus] = useState<DateRange | null>(null)
 
-  const changePeriod = (preset: DateRangePreset, range: DateRange) => {
-    setPeriod({ preset, range })
+  const changePeriod = (next: PeriodSelection) => {
+    setPeriod(next)
     setFocus(null)
   }
-  const changeGranularity = (next: StatisticsGranularity) => {
+  const changeGranularity = (next: TrendGranularity) => {
     setGranularity(next)
     setFocus(null)
   }
@@ -143,21 +132,23 @@ export function OverviewPage() {
     try {
       window.localStorage.setItem(
         OVERVIEW_STORAGE_KEY,
-        JSON.stringify({
-          preset: period.preset,
-          from: period.range.from,
-          to: period.range.to,
-          granularity,
-        }),
+        JSON.stringify({ categoryMetric, merchantMetric }),
       )
     } catch {
       /* storage unavailable: keep the selection for this session only */
     }
-  }, [period, granularity])
+  }, [categoryMetric, merchantMetric])
+
+  /**
+   * The bucket the trend chart is drawn at. "Transaction" means one point per transaction, which
+   * only a per-category series chart can draw, so the trend falls back to months and the card says
+   * so rather than letting the control claim a granularity the chart is not using.
+   */
+  const trendGranularity: StatisticsGranularity = granularity === 'transaction' ? 'month' : granularity
 
   const trendQuery = useQuery({
-    queryKey: queryKeys.statistics.summary(rangeParams(period.range, granularity, displayCurrency)),
-    queryFn: () => statisticsApi.summary(rangeParams(period.range, granularity, displayCurrency)),
+    queryKey: queryKeys.statistics.summary(rangeParams(period.range, trendGranularity, displayCurrency)),
+    queryFn: () => statisticsApi.summary(rangeParams(period.range, trendGranularity, displayCurrency)),
     placeholderData: keepPreviousData,
   })
   const overviewRange = focus ?? period.range
@@ -172,7 +163,13 @@ export function OverviewPage() {
   const colors = amountColor[scheme]
   const loading = trendQuery.isLoading || (overviewQuery.isLoading && !overviewQuery.data)
 
-  const openTransactions = (filters: { categoryId?: number; uncategorized?: boolean; nature?: TransactionNature }) => {
+  const openTransactions = (filters: {
+    categoryId?: number
+    uncategorized?: boolean
+    nature?: TransactionNature
+    merchant?: string
+    withoutMerchant?: boolean
+  }) => {
     const query = buildQuery({
       from: overviewRange.from ?? undefined,
       to: overviewRange.to ?? undefined,
@@ -194,7 +191,12 @@ export function OverviewPage() {
       <PageHeader title="Overview" subtitle="Where the money comes from and where it goes." />
 
       <Box sx={{ minWidth: 320 }}>
-        <PeriodSelector preset={period.preset} range={period.range} onChange={changePeriod} />
+        <PeriodSelector
+          period={period}
+          granularity={granularity}
+          onChange={changePeriod}
+          onGranularityChange={changeGranularity}
+        />
       </Box>
 
       {overviewQuery.isError ? (
@@ -223,7 +225,7 @@ export function OverviewPage() {
                 Showing
               </Typography>
               <Chip
-                label={formatTrendBucket(focus.from ?? '', granularity)}
+                label={formatTrendBucket(focus.from ?? '', trendGranularity)}
                 onDelete={() => setFocus(null)}
                 size="small"
                 variant="outlined"
@@ -267,13 +269,25 @@ export function OverviewPage() {
         <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minHeight: 140 }}>
           <ChartCard
             title="Income and expenses"
-            action={<TrendControls granularity={granularity} onGranularityChange={changeGranularity} />}
+            subtitle={
+              granularity === 'transaction'
+                ? 'Individual transactions are not drawn here — showing monthly buckets.'
+                : undefined
+            }
+            action={
+              <SeriesLegend
+                items={[
+                  { label: 'Income', color: colors.income },
+                  { label: 'Expense', color: colors.expense },
+                ]}
+              />
+            }
             chartHeight={90}
           >
             <TrendChart
               data={trendQuery.data?.trend ?? []}
               baseCurrency={baseCurrency}
-              granularity={granularity}
+              granularity={trendGranularity}
               onSelect={(point: StatisticsTrendPoint) => setFocus({ from: point.start, to: point.end })}
             />
           </ChartCard>
@@ -281,13 +295,47 @@ export function OverviewPage() {
 
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flex: '1 1 0', minHeight: 140 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0 }}>
-            <ChartCard title="Spend by category" subtitle="Click a slice to see the transactions" chartHeight={90}>
-              <CategoryDonut byCategory={overviewQuery.data?.byCategory ?? []} baseCurrency={baseCurrency} onSelect={(row: DonutRow) => openTransactions(row.categoryId === null ? { uncategorized: true } : { categoryId: row.categoryId })} />
+            <ChartCard
+              title={categoryMetric === 'expense' ? 'Spend by category' : 'Income by category'}
+              subtitle="Click a slice to see the transactions"
+              action={
+                <MetricToggle
+                  direction={categoryMetric}
+                  onChange={setCategoryMetric}
+                  label="Category direction"
+                />
+              }
+              chartHeight={90}
+            >
+              <CategoryDonut
+                byCategory={overviewQuery.data?.byCategory ?? []}
+                baseCurrency={baseCurrency}
+                direction={categoryMetric}
+                onSelect={(row: DonutRow) => openTransactions(row.categoryId === null ? { uncategorized: true } : { categoryId: row.categoryId })}
+              />
             </ChartCard>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0 }}>
-            <ChartCard title="Top merchants" chartHeight={90}>
-              <TopMerchantsChart topMerchants={overviewQuery.data?.topMerchants ?? []} baseCurrency={baseCurrency} />
+            <ChartCard
+              title={merchantMetric === 'expense' ? 'Top merchants' : 'Top merchants by income'}
+              subtitle="Click a bar to see the transactions"
+              action={
+                <MetricToggle
+                  direction={merchantMetric}
+                  onChange={setMerchantMetric}
+                  label="Merchant direction"
+                />
+              }
+              chartHeight={90}
+            >
+              <TopMerchantsChart
+                topMerchants={overviewQuery.data?.topMerchants ?? []}
+                baseCurrency={baseCurrency}
+                direction={merchantMetric}
+                onSelect={(merchant) =>
+                  openTransactions(merchant === NO_MERCHANT ? { withoutMerchant: true } : { merchant })
+                }
+              />
             </ChartCard>
           </Box>
         </Box>

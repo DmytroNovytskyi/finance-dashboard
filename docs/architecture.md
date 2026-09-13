@@ -55,11 +55,13 @@ account number are set by the statements, used to recognize later imports of the
 and cannot be changed through the API — `AccountUpdateRequest` omits them, so a client that sends
 them has them ignored rather than applied. Accounts have no manual create or edit path in the UI;
 the only user actions are rename, tag, and delete.
-`nature=TRANSFER` and `nature=REFUND` rows (internal transfers between the user's own accounts, and
-a purchase with the money the bank gave back for it) are excluded from every statistic; they carry
-a reserved, non-deletable category (**Internal Transfer**, **Refund**) so they appear and filter as
-normal groups in the UI. Reserved categories are resolved by `category.system_key`, not by name:
-more than one exists and the user may rename any of them.
+`nature=TRANSFER` rows (internal transfers between the user's own accounts) are excluded from every
+statistic. `nature=REFUND` rows are excluded from income and expense as individual rows, but their
+group is not dropped: the net of each group is folded back in once, on the group's last leg, under
+the reserved Refund category — see the refund paragraph below. Both natures carry a reserved,
+non-deletable category (**Internal Transfer**, **Refund**) so they appear and filter as normal
+groups in the UI. Reserved categories are resolved by `category.system_key`, not by name: more than
+one exists and the user may rename any of them.
 
 Internal-transfer detection and review: the matcher pairs non-transfer legs between own accounts
 that reference each other's account number (mirror, works across currencies/FX) or that match in
@@ -75,28 +77,40 @@ refund — does **not** restore a category a leg carried before it was linked: l
 category with the reserved one, so unlink can only clear it. Categorize a pair after deciding it,
 not before.
 
-Refund detection and review: a refund candidate is an incoming row whose wording reverses a
-payment (`ANULOWANIE TRANSAKCJI`, `ZWROT ... TRANSAKCJI`), which is what keeps the tax office's
-`Zwrot z podatku VAT` out — it names no payment, so it is never a candidate. Pekao embeds the
-reversed transaction in that wording, and the matcher reads it: the date as `DN. dd/MM/yyyy` and
-the merchant after `WYKONANEJ:`. Credits that name the same reversed transaction — same account,
-same date, same merchant — are matched as **one group**, because a single order may come back in
-parts; the group's credits must add up to the purchase exactly. The matcher then looks for an
-expense of that magnitude in the same account, dated on or before the earliest credit and within
-120 days, preferring a purchase the anchors agree on and otherwise the nearest one; equal amount
-alone would mostly surface the user's own settlements. Each purchase is spent on one group.
-Nothing is linked automatically — a suggestion is reported as `ANCHORED` or `AMOUNT` so the reason
-is visible. A group stops being suggested once **every** leg of it carries a category, the same
-rule a transfer follows. Linking sets every leg to `REFUND` with the reserved Refund category;
-unlike a transfer the legs sit in the **same** account and must have opposite signs, with the
-credits summing to the purchase exactly, since netting out a partial refund would erase spending
-that really happened. Suggestions: `GET /api/v1/refunds/suggestions`, link one reversal
-`POST /api/v1/refunds` (`{purchaseTransactionId,refundTransactionIds:[...]}`), link all
-`POST /api/v1/refunds/suggestions/apply`, and revert `POST /api/v1/refunds/{transactionId}/unlink`
-(every leg returns to its natural income/expense and category).
+Refund detection and review. **Detection** is a matcher and stays strict: a refund candidate is an
+incoming row whose wording reverses a payment (`ANULOWANIE TRANSAKCJI`, `ZWROT ... TRANSAKCJI`),
+which is what keeps the tax office's `Zwrot z podatku VAT` out — it names no payment, so it is
+never a candidate. Pekao embeds the reversed transaction in that wording, and the matcher reads it:
+the date as `DN. dd/MM/yyyy` and the merchant after `WYKONANEJ:`. Credits that name the same
+reversed transaction — same account, same date, same merchant — are matched as **one group**,
+because a single order may come back in parts. The matcher then looks for an expense of that
+magnitude in the same account, dated on or before the earliest credit and within 120 days,
+preferring a purchase the anchors agree on and otherwise the nearest one; equal amount alone would
+mostly surface the user's own settlements. Each purchase is spent on one group. Nothing is linked
+automatically, and a suggestion is reported as `ANCHORED` or `AMOUNT` so the reason is visible. A
+group stops being suggested once **every** leg of it carries a category, the same rule a transfer
+follows.
+
+**Linking** imposes no arithmetic at all. A refund is any group of two or more rows: they need not
+add up to each other, share an account or a currency, or have opposite signs. The only rules are
+structural — two rows at minimum, no row named twice, and no leg already paired or already wearing
+a reserved category. The old sum, sign, account and currency rules existed to stop a group leaving
+the statistics with money unaccounted for, and they were removed only once the statistics stopped
+dropping a group: each one is folded back in as its **net**, dated at its **last leg** and filed
+under the reserved Refund category, so income − expense still reconciles with what actually moved.
+A group whose net is exactly zero contributes nothing, which is why a balanced reversal reads
+exactly as it always did. Folding counts only the legs inside the requested range, so a group
+straddling a period boundary still totals correctly across periods. This means the figures inside a
+group's span are **settled, not accrued**: a January credit belonging to a group that closes in
+February is reported in February.
+
+Suggestions: `GET /api/v1/refunds/suggestions`, link a group `POST /api/v1/refunds`
+(`{transactionIds:[...]}`), link all `POST /api/v1/refunds/suggestions/apply`, and revert
+`POST /api/v1/refunds/{transactionId}/unlink` (every leg returns to its natural income/expense and
+category).
 
 Transactions: `GET /api/v1/transactions` lists filtered rows (`accountId`, `categoryId`/`uncategorized`,
-`nature`, `from`/`to`, `q`, `ids` repeated, `page`/`size`) ordered by `sort`
+`nature`, `from`/`to`, `q`, `ids` repeated, `merchant`, `withoutMerchant`, `page`/`size`) ordered by `sort`
 (`date|amount|account|category`) with `order` (`asc|desc`; default date descending). Account and
 category order by their names. `ids` restricts the list to an explicit set of rows — an empty or
 absent list means no constraint — which is how clicking a suggested pair shows the transactions it

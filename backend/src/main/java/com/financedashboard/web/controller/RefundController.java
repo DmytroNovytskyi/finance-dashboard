@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** REST endpoints for pairing purchases with their refunds. */
+/** REST endpoints for linking transactions into refund groups and reverting them. */
 @RestController
 @RequestMapping("/api/v1/refunds")
 @RequiredArgsConstructor
@@ -33,15 +33,10 @@ public class RefundController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public RefundPairResponse pair(@Valid @RequestBody PairRefundRequest request) {
-        List<Transaction> legs = refunds.pairRefund(
-                request.purchaseTransactionId(), request.refundTransactionIds());
-        List<TransactionResponse> credits = legs.subList(1, legs.size()).stream()
-                .map(TransactionResponse::from)
-                .toList();
+        List<Transaction> legs = refunds.pairRefund(request.transactionIds());
         return new RefundPairResponse(
                 legs.get(0).getRefundGroupId(),
-                TransactionResponse.from(legs.get(0)),
-                credits);
+                legs.stream().map(TransactionResponse::from).toList());
     }
 
     /** Lists currently detected purchase-and-refund pairs that are not yet linked. */
@@ -58,7 +53,7 @@ public class RefundController {
     }
 
     /**
-     * Reverts the refund that one of its legs belongs to: both legs become a normal income/expense
+     * Reverts the refund that one of its legs belongs to: every leg becomes a normal income/expense
      * again. Returns how many legs were reverted.
      */
     @PostMapping("/{transactionId}/unlink")

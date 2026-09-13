@@ -63,7 +63,7 @@ function RowAmount({ transaction }: { transaction: Transaction }) {
 /** Uncategorized rows, filtered by nature, selectable for bulk assignment to a category. */
 export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const [nature, setNature] = useState<QueueNature>('EXPENSE')
-  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
+  const [selected, setSelected] = useState<ReadonlyMap<number, Transaction>>(new Map())
   const [remember, setRemember] = useState(false)
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -103,26 +103,31 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
     const timer = setTimeout(() => {
       setAppliedSearch(search)
       setPage(0)
-      setSelected(new Set())
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [search])
 
   const linking = useLinking({
     onNotice: setNotice,
-    onLinked: () => setSelected(new Set()),
+    onLinked: () => setSelected(new Map()),
   })
-  const selectedRows = rows.filter((row) => selected.has(row.id))
+  const selectedRows = [...selected.values()]
 
-  const single = selected.size === 1 ? rows.find((row) => selected.has(row.id)) : undefined
+  const single = selected.size === 1 ? selectedRows[0] : undefined
   const merchant = single?.merchant ?? null
   const hasRule = merchant !== null && (rules.data ?? []).some((rule) => rule.merchant === normalizeMerchant(merchant))
 
-  const toggle = (id: number) => {
-    const next = new Set(selected)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelected(next)
+  /**
+   * The row itself is held, not just its id, so a selection survives a search, a sort or a nature
+   * change and can still be linked from the bar while its rows are filtered out of sight.
+   */
+  const toggle = (transaction: Transaction) => {
+    setSelected((current) => {
+      const next = new Map(current)
+      if (next.has(transaction.id)) next.delete(transaction.id)
+      else next.set(transaction.id, transaction)
+      return next
+    })
   }
 
   const assignOne = (id: number, categoryId: number) => categorizeOne.mutate({ id, categoryId })
@@ -131,15 +136,18 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
     if (remember && merchant) {
       createRule.mutate({ merchant, categoryId })
     }
-    categorizeBulk.mutate({ ids: [...selected], categoryId })
-    setSelected(new Set())
+    categorizeBulk.mutate({ ids: [...selected.keys()], categoryId })
+    setSelected(new Map())
     setRemember(false)
   }
 
   const selectPage = (checked: boolean) => {
     setSelected((current) => {
-      const next = new Set(current)
-      pageRows.forEach((row) => (checked ? next.add(row.id) : next.delete(row.id)))
+      const next = new Map(current)
+      for (const row of pageRows) {
+        if (checked) next.set(row.id, row)
+        else next.delete(row.id)
+      }
       return next
     })
   }
@@ -173,7 +181,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
           onChange={(_, value) => {
             if (value) {
               setNature(value)
-              setSelected(new Set())
+              setSelected(new Map())
               setRemember(false)
               setPage(0)
             }
@@ -261,7 +269,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
               onLinkRefund={linking.linkRefund}
               onLinkTransfer={linking.linkTransfer}
             />
-            <Button size="small" onClick={() => setSelected(new Set())}>
+            <Button size="small" onClick={() => setSelected(new Map())}>
               Clear
             </Button>
           </>
@@ -321,7 +329,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
                 '&:hover': { bgcolor: 'action.hover' },
               }}
             >
-              <Checkbox size="small" checked={selected.has(transaction.id)} onChange={() => toggle(transaction.id)} aria-label={`Select transaction ${transaction.id}`} />
+              <Checkbox size="small" checked={selected.has(transaction.id)} onChange={() => toggle(transaction)} aria-label={`Select transaction ${transaction.id}`} />
               <Box sx={{ minWidth: 0, flexGrow: 1 }}>
                 <Typography variant="body2" noWrap>
                   {transaction.description || transaction.merchant || '—'}

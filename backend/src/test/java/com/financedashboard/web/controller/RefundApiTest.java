@@ -58,7 +58,7 @@ class RefundApiTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void linksAPurchaseReversedBySeveralCreditsAndUnlinksAllOfThem() throws Exception {
+    void linksSeveralLegsIntoOneRefundAndUnlinksAllOfThem() throws Exception {
         long categoryId = insertReservedCategory();
         long accountId = insertAccount();
         long statementId = insertStatement(accountId);
@@ -78,12 +78,11 @@ class RefundApiTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/api/v1/refunds")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"purchaseTransactionId\":" + purchaseId
-                                + ",\"refundTransactionIds\":[" + firstId + "," + secondId + ","
-                                + thirdId + "]}"))
+                        .content("{\"transactionIds\":[" + purchaseId + "," + firstId + ","
+                                + secondId + "," + thirdId + "]}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.refunds.length()").value(3))
-                .andExpect(jsonPath("$.purchase.nature").value("REFUND"));
+                .andExpect(jsonPath("$.transactions.length()").value(4))
+                .andExpect(jsonPath("$.transactions[0].nature").value("REFUND"));
 
         for (long id : new long[] {purchaseId, firstId, secondId, thirdId}) {
             assertThat(natureOf(id)).isEqualTo("REFUND");
@@ -100,54 +99,91 @@ class RefundApiTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void rejectsCreditsThatDoNotAddUpToThePurchase() throws Exception {
-        insertReservedCategory();
+    void linksAGroupWhoseSidesDoNotBalance() throws Exception {
+        long categoryId = insertReservedCategory();
         long accountId = insertAccount();
         long statementId = insertStatement(accountId);
-        long purchaseId = insertTransaction(statementId, accountId, "-61.46", "EXPENSE", "SOME SHOP", null);
-        long firstId = insertTransaction(statementId, accountId, "14.45", "INCOME", "ZWROT TRANSAKCJI", null);
-        long secondId = insertTransaction(statementId, accountId, "23.27", "INCOME", "ZWROT TRANSAKCJI", null);
+        long firstOut = insertTransaction(statementId, accountId, "-1000.00", "EXPENSE", "BLIK WYCHODZĄCY", null);
+        long secondOut = insertTransaction(statementId, accountId, "-1000.00", "EXPENSE", "BLIK WYCHODZĄCY", null);
+        long firstIn = insertTransaction(statementId, accountId, "2500.00", "INCOME", "BLIK PRZYCHODZĄCY", null);
+        long secondIn = insertTransaction(statementId, accountId, "500.00", "INCOME", "BLIK PRZYCHODZĄCY", null);
 
         mockMvc.perform(post("/api/v1/refunds")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"purchaseTransactionId\":" + purchaseId
-                                + ",\"refundTransactionIds\":[" + firstId + "," + secondId + "]}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void linksAPairChosenByHand() throws Exception {
-        insertReservedCategory();
-        long accountId = insertAccount();
-        long statementId = insertStatement(accountId);
-        long purchaseId = insertTransaction(statementId, accountId, "-50.00", "EXPENSE", "SOME SHOP", null);
-        long refundId = insertTransaction(statementId, accountId, "50.00", "INCOME", "ZWROT TRANSAKCJI", null);
-
-        mockMvc.perform(post("/api/v1/refunds")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"purchaseTransactionId\":" + purchaseId
-                                + ",\"refundTransactionIds\":[" + refundId + "]}"))
+                        .content("{\"transactionIds\":[" + firstOut + "," + secondOut + ","
+                                + firstIn + "," + secondIn + "]}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.refundGroupId").isNotEmpty())
-                .andExpect(jsonPath("$.purchase.nature").value("REFUND"))
-                .andExpect(jsonPath("$.refunds[0].nature").value("REFUND"));
+                .andExpect(jsonPath("$.transactions.length()").value(4));
 
-        assertThat(refundGroupOf(purchaseId)).isEqualTo(refundGroupOf(refundId)).isNotNull();
+        for (long id : new long[] {firstOut, secondOut, firstIn, secondIn}) {
+            assertThat(natureOf(id)).isEqualTo("REFUND");
+            assertThat(categoryOf(id)).isEqualTo(categoryId);
+        }
     }
 
     @Test
-    void rejectsAPairWhoseLegsHaveDifferentMagnitudes() throws Exception {
+    void linksAGroupThatOnlyGoesOneWay() throws Exception {
         insertReservedCategory();
         long accountId = insertAccount();
         long statementId = insertStatement(accountId);
-        long purchaseId = insertTransaction(statementId, accountId, "-50.00", "EXPENSE", "SOME SHOP", null);
-        long refundId = insertTransaction(statementId, accountId, "20.00", "INCOME", "ZWROT TRANSAKCJI", null);
+        long firstId = insertTransaction(statementId, accountId, "-50.00", "EXPENSE", "SOME SHOP", null);
+        long secondId = insertTransaction(statementId, accountId, "-20.00", "EXPENSE", "OTHER SHOP", null);
 
         mockMvc.perform(post("/api/v1/refunds")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"purchaseTransactionId\":" + purchaseId
-                                + ",\"refundTransactionIds\":[" + refundId + "]}"))
+                        .content("{\"transactionIds\":[" + firstId + "," + secondId + "]}"))
+                .andExpect(status().isCreated());
+
+        assertThat(refundGroupOf(firstId)).isEqualTo(refundGroupOf(secondId)).isNotNull();
+    }
+
+    @Test
+    void rejectsASingleLeg() throws Exception {
+        insertReservedCategory();
+        long accountId = insertAccount();
+        long statementId = insertStatement(accountId);
+        long onlyId = insertTransaction(statementId, accountId, "-50.00", "EXPENSE", "SOME SHOP", null);
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"transactionIds\":[" + onlyId + "]}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsALegNamedTwice() throws Exception {
+        insertReservedCategory();
+        long accountId = insertAccount();
+        long statementId = insertStatement(accountId);
+        long onlyId = insertTransaction(statementId, accountId, "-50.00", "EXPENSE", "SOME SHOP", null);
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"transactionIds\":[" + onlyId + "," + onlyId + "]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsALegThatIsAlreadyLinked() throws Exception {
+        insertReservedCategory();
+        long accountId = insertAccount();
+        long statementId = insertStatement(accountId);
+        long firstId = insertTransaction(statementId, accountId, "-50.00", "EXPENSE", "SOME SHOP", null);
+        long secondId = insertTransaction(statementId, accountId, "50.00", "INCOME", "ZWROT TRANSAKCJI", null);
+        long thirdId = insertTransaction(statementId, accountId, "-10.00", "EXPENSE", "OTHER SHOP", null);
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"transactionIds\":[" + firstId + "," + secondId + "]}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"transactionIds\":[" + firstId + "," + thirdId + "]}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(refundGroupOf(thirdId)).isNull();
     }
 
     private long insertReservedCategory() {

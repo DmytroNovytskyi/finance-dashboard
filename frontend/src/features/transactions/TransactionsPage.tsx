@@ -5,7 +5,6 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import DeleteSweep from '@mui/icons-material/DeleteSweep'
-import LinearProgress from '@mui/material/LinearProgress'
 import Snackbar from '@mui/material/Snackbar'
 import {
   useAccounts,
@@ -112,10 +111,6 @@ export function TransactionsPage() {
   useEffect(() => {
     if (rowsPerPage !== size) setSize(rowsPerPage)
   }, [rowsPerPage, size])
-
-  useEffect(() => {
-    setSelected(new Map())
-  }, [filters, sort, editMode])
 
   const pageRows = listQuery.data?.content ?? []
   const allPageSelected = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
@@ -256,7 +251,7 @@ export function TransactionsPage() {
         onEditModeChange={setEditMode}
       />
 
-      {editMode && selected.size > 0 ? (
+      {editMode ? (
         <LinkActions
           selected={[...selected.values()]}
           busy={linking.busy}
@@ -272,10 +267,6 @@ export function TransactionsPage() {
         </Box>
       ) : (
         <>
-          <Box sx={{ height: 4 }}>
-            {listQuery.isFetching ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
-          </Box>
-
           <TransactionTable
             data={listQuery.data}
             accounts={accountsById}
@@ -285,6 +276,7 @@ export function TransactionsPage() {
             containerRef={containerRef}
             rowsPerPage={rowsPerPage}
             rowHeight={rowHeight}
+            busy={listQuery.isFetching}
             editMode={editMode}
             selected={new Set(selected.keys())}
             allPageSelected={allPageSelected}

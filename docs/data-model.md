@@ -93,14 +93,16 @@ One imported file, attributed to exactly one account.
 | category_id | bigint FK → category, null | null = uncategorized |
 | dedup_hash | varchar | (date, amount, currency, description) — idempotent import |
 | transfer_group_id | uuid null | shared by the two legs of an internal transfer |
-| refund_group_id | uuid null | shared by a purchase and every credit that reverses it (an order can come back in parts) |
+| refund_group_id | uuid null | shared by every leg of one refund; the legs carry no roles, so a group is just a set |
 | created_at | timestamptz | |
 
 `EXPENSE` and `INCOME` participate in statistics; `TRANSFER` rows (money moved between the
-user's own accounts, including currency conversions) and `REFUND` rows (a purchase and the money
-the bank gave back for it) are excluded from all spend/income stats. The `amount`/`currency` pair
-is the **native** value from the statement (what the account is denominated in) — see
-`transaction_amount` for the per-currency views.
+user's own accounts, including currency conversions) are excluded from all spend/income stats.
+`REFUND` rows are excluded as individual rows too, but their group is folded back in as its **net**
+— once, dated at the group's last leg, under the reserved Refund category — so nothing a refund
+group moved is lost from the totals. The `amount`/`currency` pair is the **native** value from the
+statement (what the account is denominated in) — see `transaction_amount` for the per-currency
+views.
 
 ## `transaction_amount`
 

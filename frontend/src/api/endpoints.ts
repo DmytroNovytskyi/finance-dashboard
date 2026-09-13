@@ -29,6 +29,10 @@ export interface TransactionListParams {
   q?: string
   /** Repeated `ids` query params; restricts the list to an explicit set of rows. */
   ids?: number[]
+  /** One merchant, matched exactly. */
+  merchant?: string
+  /** Selects the rows carrying no merchant at all; the opposite of {@link merchant}, not its absence. */
+  withoutMerchant?: boolean
   sort?: TransactionSortKey
   order?: 'asc' | 'desc'
   page?: number
@@ -159,11 +163,11 @@ export const transfersApi = {
 export const refundsApi = {
   /** Detected purchase-and-refund pairs that are not linked yet. */
   suggestions: () => request<RefundSuggestion[]>('/refunds/suggestions'),
-  /** Links a purchase with the one or more credits that reverse it. */
-  pair: (purchaseTransactionId: number, refundTransactionIds: number[]) =>
+  /** Links two or more transactions as one refund; the ids carry no role. */
+  pair: (transactionIds: number[]) =>
     request<RefundPair>('/refunds', {
       method: 'POST',
-      body: JSON.stringify({ purchaseTransactionId, refundTransactionIds }),
+      body: JSON.stringify({ transactionIds }),
     }),
   /** Links every current suggestion. */
   applyAll: () => request<{ applied: number }>('/refunds/suggestions/apply', { method: 'POST' }),

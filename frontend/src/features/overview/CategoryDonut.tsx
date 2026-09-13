@@ -7,6 +7,7 @@ import { categoricalPalette, uncategorizedColor, useScheme } from '../../theme'
 import { formatMoneyMagnitude } from '../../lib/format'
 import { ChartTooltipCard } from '../../components/ChartTooltip'
 import { EmptyState } from '../../components/EmptyState'
+import type { Direction } from './MetricToggle'
 
 export interface DonutRow {
   categoryId: number | null
@@ -18,17 +19,27 @@ export interface DonutRow {
 interface CategoryDonutProps {
   byCategory: StatisticsByCategory[]
   baseCurrency: string
+  direction: Direction
   onSelect: (row: DonutRow) => void
 }
 
-/** Resolves one stable color per category: its own color, gray for the uncategorized bucket. */
-function buildRows(byCategory: StatisticsByCategory[], scheme: 'light' | 'dark'): DonutRow[] {
-  const withSpend = byCategory.filter((category) => category.expense > 0)
-  const uncolored = withSpend
+/**
+ * Resolves one stable color per category: its own color, gray for the uncategorized bucket. Only
+ * categories with money on the chosen side are kept, so switching to income drops the categories
+ * that only ever paid out and a refund group, which is income when its net is positive, appears
+ * just like any other.
+ */
+function buildRows(
+  byCategory: StatisticsByCategory[],
+  scheme: 'light' | 'dark',
+  direction: Direction,
+): DonutRow[] {
+  const withMoney = byCategory.filter((category) => category[direction] > 0)
+  const uncolored = withMoney
     .filter((category) => !category.color && category.categoryId !== null)
     .sort((a, b) => (a.categoryName ?? '').localeCompare(b.categoryName ?? ''))
   const fallbackIndex = new Map(uncolored.map((category, index) => [category.categoryId, index]))
-  const rows = withSpend.map((category) => {
+  const rows = withMoney.map((category) => {
     const isUncategorized = category.categoryId === null
     const color = isUncategorized
       ? uncategorizedColor[scheme]
@@ -36,19 +47,23 @@ function buildRows(byCategory: StatisticsByCategory[], scheme: 'light' | 'dark')
     return {
       categoryId: category.categoryId,
       name: category.categoryName ?? '(uncategorized)',
-      value: Math.abs(category.expense),
+      value: Math.abs(category[direction]),
       color,
     }
   })
   return rows.sort((a, b) => b.value - a.value)
 }
 
-/** Spend by category: a donut for the big buckets beside a labeled, valued list. */
-export function CategoryDonut({ byCategory, baseCurrency, onSelect }: CategoryDonutProps) {
+/** By category: a donut for the big buckets beside a labeled, valued list, for either direction. */
+export function CategoryDonut({ byCategory, baseCurrency, direction, onSelect }: CategoryDonutProps) {
   const scheme = useScheme()
-  const rows = useMemo(() => buildRows(byCategory, scheme), [byCategory, scheme])
+  const rows = useMemo(() => buildRows(byCategory, scheme, direction), [byCategory, scheme, direction])
   if (rows.length === 0) {
-    return <EmptyState title="No expenses in this period" hint="Transactions with a category will appear here." />
+    return direction === 'expense' ? (
+      <EmptyState title="No expenses in this period" hint="Transactions with a category will appear here." />
+    ) : (
+      <EmptyState title="No income in this period" hint="Money coming in with a category will appear here." />
+    )
   }
   const total = rows.reduce((sum, row) => sum + row.value, 0)
 

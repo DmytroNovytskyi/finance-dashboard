@@ -5,14 +5,23 @@ import Chip from '@mui/material/Chip'
 import Grid from '@mui/material/Grid'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
-import Select from '@mui/material/Select'
+import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useCategories } from '../../api/queries'
 import { statisticsApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
-import { rangeForPreset, type DateRange, type DateRangePreset } from '../../lib/date'
-import { formatCompact, formatDate, formatDateRange, formatInteger, formatMoney, formatMoneyMagnitude, formatShortDate, formatTrendBucket } from '../../lib/format'
+import type { DateRange } from '../../lib/date'
+import {
+  formatCompact,
+  formatDate,
+  formatDateRange,
+  formatInteger,
+  formatMoney,
+  formatMoneyMagnitude,
+  formatShortDate,
+  formatTrendBucket,
+} from '../../lib/format'
 import { amountColor, chartInk, useScheme } from '../../theme'
 import { ChartCard } from '../../components/ChartCard'
 import { ChartTooltipCard } from '../../components/ChartTooltip'
@@ -23,74 +32,35 @@ import { StatementFreshness } from '../../components/StatementFreshness'
 import type { CategoryPresentation } from '../../api/queries'
 import type { StatisticsCategorySeriesPoint, StatisticsGranularity, StatisticsTrendPoint } from '../../types'
 import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
+import {
+  granularityLabel,
+  useStatisticsPreferences,
+  type PeriodSelection,
+  type TrendGranularity,
+} from '../preferences/statisticsPreferences'
 import { PeriodSelector } from '../overview/PeriodSelector'
 
-/** Kept under its original name so the saved period and category choice survive the rename. */
+/** Kept under its original name so the saved category chart choice survives the rename. */
 const TRENDS_STORAGE_KEY = 'finance-dashboard.categories.v1'
-const DEFAULT_PERIOD: PeriodState = { preset: 'thisYear', range: rangeForPreset('thisYear') }
-
-type CategoryGranularity = 'transaction' | StatisticsGranularity
-
-const GRANULARITY_OPTIONS: { value: CategoryGranularity; label: string }[] = [
-  { value: 'transaction', label: 'Transaction' },
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-  { value: 'quarter', label: 'Quarter' },
-  { value: 'year', label: 'Year' },
-]
-
-function granularityLabel(value: CategoryGranularity): string {
-  return GRANULARITY_OPTIONS.find((option) => option.value === value)?.label ?? value
-}
-
-function isGranularity(value: unknown): value is CategoryGranularity {
-  return GRANULARITY_OPTIONS.some((option) => option.value === value)
-}
-
-interface PeriodState {
-  preset: DateRangePreset
-  range: DateRange
-}
 
 interface StoredTrendsState {
-  preset?: unknown
-  from?: unknown
-  to?: unknown
   categories?: unknown
-  granularity?: unknown
 }
 
-interface StoredTrends {
-  period: PeriodState
-  categoryIds: number[]
-  granularity: CategoryGranularity
-}
-
-function loadTrendsState(): StoredTrends {
-  const fallback: StoredTrends = { period: DEFAULT_PERIOD, categoryIds: [], granularity: 'transaction' }
+/**
+ * Reads the chosen category charts back. The period and the granularity are not stored here: both
+ * statistics pages share them through {@link useStatisticsPreferences}.
+ */
+function loadTrendsState(): number[] {
   try {
     const raw = window.localStorage.getItem(TRENDS_STORAGE_KEY)
-    if (!raw) return fallback
+    if (!raw) return []
     const stored = JSON.parse(raw) as StoredTrendsState
-    const preset = typeof stored.preset === 'string' ? (stored.preset as DateRangePreset) : DEFAULT_PERIOD.preset
-    const period: PeriodState =
-      preset === 'custom'
-        ? {
-            preset,
-            range: {
-              from: typeof stored.from === 'string' ? stored.from : null,
-              to: typeof stored.to === 'string' ? stored.to : null,
-            },
-          }
-        : { preset, range: rangeForPreset(preset) }
-    const categoryIds = Array.isArray(stored.categories)
+    return Array.isArray(stored.categories)
       ? stored.categories.filter((id): id is number => typeof id === 'number')
       : []
-    const granularity = isGranularity(stored.granularity) ? stored.granularity : fallback.granularity
-    return { period, categoryIds, granularity }
   } catch {
-    return fallback
+    return []
   }
 }
 
@@ -157,16 +127,16 @@ function bucketStatsOf(buckets: StatisticsTrendPoint[]): CategoryStats {
 export function TrendsPage() {
   const categories = useCategories()
   const { displayCurrency } = useDisplayCurrency()
-  const [period, setPeriod] = useState<PeriodState>(() => loadTrendsState().period)
-  const [granularity, setGranularity] = useState<CategoryGranularity>(() => loadTrendsState().granularity)
-  const [categoryIds, setCategoryIds] = useState<number[]>(() => loadTrendsState().categoryIds)
+  const { period, granularity, setPeriod, setGranularity } = useStatisticsPreferences()
+  const [categoryIds, setCategoryIds] = useState<number[]>(loadTrendsState)
   const [pending, setPending] = useState('')
 
   const byId = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
   const selected = categoryIds.map((id) => byId.get(id)).filter((category): category is CategoryPresentation => !!category)
   const addable = categories.filter((category) => !category.system && !categoryIds.includes(category.id))
 
-  const changePeriod = (preset: DateRangePreset, range: DateRange) => setPeriod({ preset, range })
+  const changePeriod = (next: PeriodSelection) => setPeriod(next)
+  const changeGranularity = (next: TrendGranularity) => setGranularity(next)
 
   const addCategory = (id: string) => {
     const numeric = Number(id)
@@ -181,18 +151,12 @@ export function TrendsPage() {
     try {
       window.localStorage.setItem(
         TRENDS_STORAGE_KEY,
-        JSON.stringify({
-          preset: period.preset,
-          from: period.range.from,
-          to: period.range.to,
-          categories: categoryIds,
-          granularity,
-        }),
+        JSON.stringify({ categories: categoryIds }),
       )
     } catch {
       /* storage unavailable: keep the selection for this session only */
     }
-  }, [period, categoryIds, granularity])
+  }, [categoryIds])
 
   return (
     <PageShell>
@@ -201,32 +165,30 @@ export function TrendsPage() {
         subtitle="A chart per category; the period and granularity below drive every chart."
       />
 
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Box sx={{ flexGrow: 1, minWidth: 320 }}>
-          <PeriodSelector preset={period.preset} range={period.range} onChange={changePeriod} />
-        </Box>
-        <Select
+      <PeriodSelector
+        period={period}
+        granularity={granularity}
+        onChange={changePeriod}
+        onGranularityChange={changeGranularity}
+      />
+
+      <StatementFreshness />
+
+      <Paper
+        variant="outlined"
+        sx={{ px: 2, py: 1.5, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}
+      >
+        <TextField
+          select
           size="small"
-          value={granularity}
-          onChange={(event) => setGranularity(event.target.value as CategoryGranularity)}
-          renderValue={(value) => granularityLabel(value)}
-          aria-label="Chart granularity"
-          sx={{ minWidth: 150, '.MuiSelect-select': { py: 0.75 } }}
-        >
-          {GRANULARITY_OPTIONS.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </Select>
-        <Select
-          size="small"
-          displayEmpty
+          label="Add category"
           value={pending}
           onChange={(event) => addCategory(event.target.value)}
-          renderValue={() => 'Add a category…'}
-          aria-label="Add a category chart"
-          sx={{ minWidth: 190, '.MuiSelect-select': { py: 0.75 } }}
+          slotProps={{
+            select: { displayEmpty: true, renderValue: () => 'Choose a category…' },
+            inputLabel: { shrink: true },
+          }}
+          sx={{ minWidth: 220 }}
         >
           {addable.length === 0 ? (
             <MenuItem value="" disabled>
@@ -242,32 +204,26 @@ export function TrendsPage() {
               </MenuItem>
             ))
           )}
-        </Select>
-      </Box>
+        </TextField>
 
-      <StatementFreshness />
+        {selected.map((category) => (
+          <Chip
+            key={category.id}
+            label={category.name}
+            onDelete={() => removeCategory(category.id)}
+            variant="outlined"
+            sx={{
+              height: 40,
+              borderRadius: 2,
+              pl: 0.5,
+              '.MuiChip-label': { px: 1.5, fontSize: '0.9375rem' },
+              '.MuiChip-deleteIcon': { fontSize: 20, mr: 1 },
+            }}
+          />
+        ))}
+      </Paper>
 
       <PageScroll>
-        {selected.length > 0 ? (
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
-            {selected.map((category) => (
-              <Chip
-                key={category.id}
-                label={category.name}
-                onDelete={() => removeCategory(category.id)}
-                variant="outlined"
-                sx={{
-                  height: 44,
-                  borderRadius: 2,
-                  pl: 0.5,
-                  '.MuiChip-label': { px: 1.5, fontSize: '0.9375rem' },
-                  '.MuiChip-deleteIcon': { fontSize: 20, mr: 1 },
-                }}
-              />
-            ))}
-          </Box>
-        ) : null}
-
         {selected.length === 0 ? (
           <Paper variant="outlined" sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">Add a category above to chart its income and expenses over time.</Typography>

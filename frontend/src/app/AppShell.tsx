@@ -20,9 +20,6 @@ import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
-import { CurrencySelect } from '../features/overview/CurrencySelect'
-import { useDisplayCurrency } from '../features/preferences/displayCurrency'
-
 const DRAWER_WIDTH = 280
 
 const NAV_ITEMS = [
@@ -70,7 +67,6 @@ export function AppShell() {
           <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
             <NavList />
           </Box>
-          <CurrencyFooter />
         </Box>
       </Drawer>
 
@@ -130,28 +126,6 @@ function AppTitle() {
     >
       Finance Dashboard
     </Typography>
-  )
-}
-
-function CurrencyFooter() {
-  const { displayCurrency, setDisplayCurrency } = useDisplayCurrency()
-  return (
-    <Box
-      sx={{
-        p: 1.5,
-        px: 2,
-        borderTop: 1,
-        borderColor: 'divider',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.5,
-      }}
-    >
-      <Typography variant="caption" color="text.secondary">
-        Show amounts in
-      </Typography>
-      <CurrencySelect value={displayCurrency} onChange={setDisplayCurrency} />
-    </Box>
   )
 }
 

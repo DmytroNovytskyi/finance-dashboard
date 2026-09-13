@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +28,10 @@ import org.springframework.stereotype.Service;
 
 /**
  * Use case for spending statistics over a period. Only {@code INCOME} and {@code EXPENSE}
- * transactions count (internal transfers are excluded). Each transaction contributes its stored
- * value in the requested currency (from the {@code transaction_amount} rows baked at import), so
- * no read-time conversion is needed and every supported currency is reported directly.
+ * transactions count as income and expense; internal transfers are excluded outright, and a refund
+ * group is folded back in as its net (see {@link #foldRefundGroups}). Each transaction contributes
+ * its stored value in the requested currency (from the {@code transaction_amount} rows baked at
+ * import), so no read-time conversion is needed and every supported currency is reported directly.
  */
 @Service
 @RequiredArgsConstructor
@@ -149,9 +151,9 @@ public class StatisticsService {
         }
         String code = supportedCurrencies.resolve(displayCurrency);
         Collection<Long> accountIds = resolveAccountIds(accountId, kind);
-        List<Transaction> rows = (accountIds == null || !accountIds.isEmpty())
-                ? transactions.findStatistical(from, to, accountIds)
-                : List.of();
+        boolean anyAccounts = accountIds == null || !accountIds.isEmpty();
+        List<Transaction> rows = anyAccounts ? transactions.findStatistical(from, to, accountIds) : List.of();
+        List<Transaction> refunds = anyAccounts ? transactions.findRefunds(from, to, accountIds) : List.of();
         Map<Long, BigDecimal> amounts = amountsFor(rows, code);
 
         Map<Long, Category> categoryById = categories.findAll().stream()
@@ -166,6 +168,7 @@ public class StatisticsService {
         LocalDate maxDate = null;
         long uncategorized = 0;
 
+        List<Contribution> contributions = new ArrayList<>();
         for (Transaction tx : rows) {
             LocalDate date = tx.getTransactionDate();
             minDate = minDate == null || date.isBefore(minDate) ? date : minDate;
@@ -174,17 +177,23 @@ public class StatisticsService {
             if (value == null) {
                 continue;
             }
-            totals.add(value);
-            byMonth.computeIfAbsent(YearMonth.from(date), m -> new Sums()).add(value);
-            TrendGranularity.Bucket bucket = granularity.bucketOf(date);
-            byBucket.computeIfAbsent(bucket.start(), k -> new Sums()).add(value);
-            byCategory.computeIfAbsent(tx.getCategoryId(), c -> new Sums()).add(value);
-            String merchant = tx.getMerchant() == null || tx.getMerchant().isBlank()
-                    ? NO_MERCHANT_LABEL : tx.getMerchant().trim();
-            byMerchant.computeIfAbsent(merchant, m -> new Sums()).add(value);
+            contributions.add(new Contribution(date, tx.getCategoryId(), merchantOf(tx), value, 1));
             if (tx.getCategoryId() == null) {
                 uncategorized++;
             }
+        }
+        contributions.addAll(foldRefundGroups(refunds, amountsFor(refunds, code)));
+
+        for (Contribution contribution : contributions) {
+            totals.add(contribution.amount(), contribution.rowCount());
+            byMonth.computeIfAbsent(YearMonth.from(contribution.date()), m -> new Sums())
+                    .add(contribution.amount());
+            byBucket.computeIfAbsent(granularity.bucketOf(contribution.date()).start(), k -> new Sums())
+                    .add(contribution.amount());
+            byCategory.computeIfAbsent(contribution.categoryId(), c -> new Sums())
+                    .add(contribution.amount());
+            byMerchant.computeIfAbsent(contribution.merchant(), m -> new Sums())
+                    .add(contribution.amount());
         }
 
         BigDecimal avgPerDay = totals.expense.divide(
@@ -307,6 +316,70 @@ public class StatisticsService {
         return new CategoryTrend(code, buckets);
     }
 
+    /**
+     * One dated amount to accumulate, carrying exactly what the buckets need so the accumulation
+     * below does not care whether it came from a single transaction or from a refund group folded
+     * into its net.
+     */
+    private record Contribution(LocalDate date, Long categoryId, String merchant, BigDecimal amount,
+                                long rowCount) {
+    }
+
+    /**
+     * Folds every refund group into a single contribution: the group's signed net, dated at its last
+     * leg and filed under the category its legs carry. Only the legs inside the requested range take
+     * part, so a group spanning the range's edge still totals correctly across periods.
+     *
+     * <p>A group whose net is zero contributes nothing at all. That is what a reversed purchase does
+     * — it offsets exactly — and leaving it out keeps the figures for every group linked under the
+     * old all-or-nothing rules exactly where they were.
+     *
+     * <p>The contribution counts its legs towards the transaction count rather than one, so that
+     * linking a group never moves that figure: the rows still exist, only their money is folded.
+     */
+    private static List<Contribution> foldRefundGroups(List<Transaction> refunds, Map<Long, BigDecimal> amounts) {
+        Map<UUID, List<Transaction>> byGroup = new LinkedHashMap<>();
+        List<List<Transaction>> groups = new ArrayList<>();
+        for (Transaction leg : refunds) {
+            UUID group = leg.getRefundGroupId();
+            if (group == null) {
+                groups.add(List.of(leg));
+            } else {
+                byGroup.computeIfAbsent(group, key -> new ArrayList<>()).add(leg);
+            }
+        }
+        groups.addAll(byGroup.values());
+
+        List<Contribution> folded = new ArrayList<>();
+        for (List<Transaction> group : groups) {
+            BigDecimal net = BigDecimal.ZERO;
+            long legs = 0;
+            Transaction last = null;
+            for (Transaction leg : group) {
+                BigDecimal value = amounts.get(leg.getId());
+                if (value == null) {
+                    continue;
+                }
+                net = net.add(value);
+                legs++;
+                if (last == null || leg.getTransactionDate().isAfter(last.getTransactionDate())) {
+                    last = leg;
+                }
+            }
+            if (last == null || net.signum() == 0) {
+                continue;
+            }
+            folded.add(new Contribution(last.getTransactionDate(), last.getCategoryId(),
+                    merchantOf(last), net, legs));
+        }
+        return folded;
+    }
+
+    private static String merchantOf(Transaction transaction) {
+        return transaction.getMerchant() == null || transaction.getMerchant().isBlank()
+                ? NO_MERCHANT_LABEL : transaction.getMerchant().trim();
+    }
+
     /** The stored amount in {@code code} for each transaction in {@code rows}. */
     private Map<Long, BigDecimal> amountsFor(List<Transaction> rows, String code) {
         if (rows.isEmpty()) {
@@ -350,12 +423,16 @@ public class StatisticsService {
         private long count;
 
         void add(BigDecimal amount) {
+            add(amount, 1);
+        }
+
+        void add(BigDecimal amount, long contributionCount) {
             if (amount.signum() >= 0) {
                 income = income.add(amount);
             } else {
                 expense = expense.subtract(amount);
             }
-            count++;
+            count += contributionCount;
         }
 
         private BigDecimal net() {

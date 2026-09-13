@@ -209,9 +209,8 @@ export interface RefundSuggestion {
   reason: 'ANCHORED' | 'AMOUNT'
 }
 
-/** The purchase and the credits of an applied reversal. */
+/** The legs of an applied refund, in the order they were linked. */
 export interface RefundPair {
   refundGroupId: string | null
-  purchase: Transaction
-  refunds: Transaction[]
+  transactions: Transaction[]
 }

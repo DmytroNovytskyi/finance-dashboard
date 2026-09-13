@@ -1,10 +1,12 @@
 import Button from '@mui/material/Button'
+import Chip from '@mui/material/Chip'
 import Edit from '@mui/icons-material/Edit'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import type { AccountPresentation, CategoryPresentation } from '../../api/queries'
+import { DateRangeControl } from '../../components/DateRangeControl'
 import type { TransactionNature } from '../../types'
 import { hasFilters, tagWordOf, type TxFilters } from './model'
 
@@ -108,22 +110,21 @@ export function TransactionFilters({
         <MenuItem value="INCOME">Income</MenuItem>
         <MenuItem value="EXPENSE">Expense</MenuItem>
       </TextField>
-      <TextField
-        type="date"
-        size="small"
-        label="From"
-        value={filters.from ?? ''}
-        onChange={(event) => patch({ from: event.target.value || undefined })}
-        slotProps={{ inputLabel: { shrink: true } }}
+      <DateRangeControl
+        mode={filters.dateMode}
+        range={{ from: filters.from ?? null, to: filters.to ?? null }}
+        onChange={(dateMode, range) =>
+          patch({ dateMode, from: range.from ?? undefined, to: range.to ?? undefined })
+        }
       />
-      <TextField
-        type="date"
-        size="small"
-        label="To"
-        value={filters.to ?? ''}
-        onChange={(event) => patch({ to: event.target.value || undefined })}
-        slotProps={{ inputLabel: { shrink: true } }}
-      />
+      {filters.merchant !== undefined || filters.withoutMerchant ? (
+        <Chip
+          size="small"
+          variant="outlined"
+          label={filters.withoutMerchant ? 'No merchant' : `Merchant: ${filters.merchant}`}
+          onDelete={() => patch({ merchant: undefined, withoutMerchant: undefined })}
+        />
+      ) : null}
       {hasFilters(filters) ? (
         <Button size="small" onClick={onClear}>
           Clear

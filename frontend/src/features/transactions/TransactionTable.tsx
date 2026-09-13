@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import Box from '@mui/material/Box'
 import Checkbox from '@mui/material/Checkbox'
 import IconButton from '@mui/material/IconButton'
+import LinearProgress from '@mui/material/LinearProgress'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
@@ -32,6 +33,13 @@ import type { TransactionSort } from './model'
  */
 export const TABLE_ROW_HEIGHT = 75
 
+/**
+ * Width of the selection column. Set as an inline style because it has to beat the table cell's own
+ * class: the cell keeps a 16px inset and holds a 20px checkbox, and left to itself the column comes
+ * out narrower than that, so the checkbox runs into the Date heading beside it.
+ */
+const CHECKBOX_CELL_SIZE = { width: 48, minWidth: 48 }
+
 interface TransactionTableProps {
   data: PageResponse<Transaction> | undefined
   accounts: Map<number, AccountPresentation>
@@ -45,6 +53,8 @@ interface TransactionTableProps {
   rowsPerPage: number
   /** Height each row takes so the page fills the table, or null before it has been measured. */
   rowHeight: number | null
+  /** Whether a page of rows is on its way, drawn as a strip inside this card rather than above it. */
+  busy: boolean
   /** Whether the page is in edit mode: selection, linking and category editing are offered. */
   editMode: boolean
   /** Ids of the selected rows; only meaningful in edit mode. */
@@ -140,8 +150,7 @@ function PairedCategoryCell({
 function AmountCell({ transaction }: { transaction: Transaction }) {
   const scheme = useScheme()
   const colors = amountColor[scheme]
-  const excluded = transaction.nature === 'TRANSFER' || transaction.nature === 'REFUND'
-  const color = excluded ? 'text.disabled' : transaction.amount >= 0 ? colors.income : colors.expense
+  const color = transaction.amount >= 0 ? colors.income : colors.expense
   return (
     <Typography
       variant="body2"
@@ -249,6 +258,7 @@ export function TransactionTable({
   containerRef,
   rowsPerPage,
   rowHeight,
+  busy,
   editMode,
   selected,
   allPageSelected,
@@ -289,14 +299,25 @@ export function TransactionTable({
   return (
     <Paper
       variant="outlined"
-      sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 140 }}
+      sx={{
+        borderRadius: 3,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        minHeight: 140,
+        position: 'relative',
+      }}
     >
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, zIndex: 2 }}>
+        {busy ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
+      </Box>
       <TableContainer ref={containerRef} sx={{ flex: 1, minHeight: 0, overscrollBehaviorY: 'contain' }}>
         <Table size="small" stickyHeader sx={{ minWidth: 860, tableLayout: 'fixed' }}>
           <TableHead>
             <TableRow>
               {editMode ? (
-                <TableCell padding="checkbox">
+                <TableCell padding="checkbox" style={CHECKBOX_CELL_SIZE}>
                   <Checkbox
                     size="small"
                     indeterminate={somePageSelected && !allPageSelected}
@@ -339,7 +360,7 @@ export function TransactionTable({
                 return (
                   <TableRow key={transaction.id} hover sx={{ height: rowHeight ?? TABLE_ROW_HEIGHT }}>
                     {editMode ? (
-                      <TableCell padding="checkbox">
+                      <TableCell padding="checkbox" style={CHECKBOX_CELL_SIZE}>
                         <Checkbox
                           size="small"
                           checked={selected.has(transaction.id)}

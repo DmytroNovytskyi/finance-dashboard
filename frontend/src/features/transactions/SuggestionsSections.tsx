@@ -66,7 +66,7 @@ export function SuggestionsSections({ onSelect }: SuggestionsSectionsProps) {
   const applyAllRefunds = useMutation({ mutationFn: () => refundsApi.applyAll(), onSuccess: invalidate })
   const applyRefund = useMutation({
     mutationFn: (suggestion: RefundSuggestion) =>
-      refundsApi.pair(suggestion.purchaseTransactionId, suggestion.refundTransactionIds),
+      refundsApi.pair([suggestion.purchaseTransactionId, ...suggestion.refundTransactionIds]),
     onSuccess: invalidate,
   })
 

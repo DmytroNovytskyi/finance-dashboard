@@ -107,6 +107,30 @@ class TransactionApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void filtersByMerchantAndByHavingNone() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions").param("merchant", "Example Market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(txA));
+
+        mockMvc.perform(get("/api/v1/transactions").param("withoutMerchant", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        jdbcTemplate.update("update transaction set merchant = '  Example Market  ' where id = ?", txB);
+        jdbcTemplate.update("update transaction set merchant = null where id = ?", txD);
+
+        mockMvc.perform(get("/api/v1/transactions").param("merchant", "Example Market"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(get("/api/v1/transactions").param("withoutMerchant", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(txD));
+    }
+
+    @Test
     void listsOnlyTheGivenIds() throws Exception {
         mockMvc.perform(get("/api/v1/transactions")
                         .param("ids", String.valueOf(txA))

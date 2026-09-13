@@ -9,10 +9,9 @@ import com.financedashboard.domain.port.TransactionRepository;
 import com.financedashboard.domain.statement.BankStatement;
 import com.financedashboard.domain.transaction.Transaction;
 import com.financedashboard.domain.transaction.TransactionNature;
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -191,65 +190,45 @@ public class TransactionEditService {
     }
 
     /**
-     * Pairs a purchase with the refund that reverses it: every leg becomes {@code REFUND} and takes
-     * the reserved Refund category, so none of them counts towards statistics. One purchase may be
-     * reversed by several credits — an order refunded in parts — so the call takes a list. The
-     * purchase must be outgoing and the refunds incoming, all in the same account and currency, and
-     * the credits must add up to the purchase exactly: netting out a partial refund would erase
-     * spending that really happened. Returns the stored legs, the purchase first.
+     * Links a group of two or more transactions as one refund: every leg becomes {@code REFUND} and
+     * takes the reserved Refund category. The only shape rules are structural — a refund needs two
+     * rows, no row may appear twice, and no leg may already be paired or wear a reserved category.
+     * The legs need not add up to each other, share an account, a currency or opposite signs.
+     *
+     * <p>Nothing is lost by allowing a group that does not balance, because the statistics do not
+     * drop the group: {@code StatisticsService} folds it back in as its net, on its last leg's date,
+     * under the Refund category. That fold is what the old sum, sign, account and currency rules were
+     * standing in for, so it is what had to exist before they could go.
+     *
+     * <p>Returns the stored legs.
      */
     @Transactional
-    public List<Transaction> pairRefund(Long purchaseId, List<Long> refundIds) {
-        if (refundIds.isEmpty()) {
-            throw new IllegalArgumentException("A refund needs at least one incoming leg");
+    public List<Transaction> pairRefund(List<Long> ids) {
+        if (ids.size() < 2) {
+            throw new IllegalArgumentException("A refund needs at least two transactions");
         }
-        if (refundIds.contains(purchaseId)) {
-            throw new IllegalArgumentException("A transaction cannot be on both sides of a refund");
+        if (new HashSet<>(ids).size() != ids.size()) {
+            throw new IllegalArgumentException("A transaction cannot appear twice in a refund");
         }
-        Transaction purchase = get(purchaseId);
-        if (purchase.getAmount().signum() >= 0) {
-            throw new IllegalArgumentException("The purchase must be an outgoing amount");
-        }
-        if (isPaired(purchase)) {
-            throw new IllegalArgumentException("One of the transactions is already paired");
-        }
-        List<Transaction> refunds = refundIds.stream().map(this::get).toList();
-        BigDecimal refunded = BigDecimal.ZERO;
-        for (Transaction refund : refunds) {
-            if (refund.getAmount().signum() <= 0) {
-                throw new IllegalArgumentException("Every refund leg must be an incoming amount");
-            }
-            if (!Objects.equals(purchase.getAccountId(), refund.getAccountId())) {
-                throw new IllegalArgumentException("Refund legs must belong to the same account");
-            }
-            if (!purchase.getCurrency().equals(refund.getCurrency())) {
-                throw new IllegalArgumentException("Refund legs must share the purchase's currency");
-            }
-            if (isPaired(refund)) {
+        List<Transaction> legs = ids.stream().map(this::get).toList();
+        for (Transaction leg : legs) {
+            if (isPaired(leg)) {
                 throw new IllegalArgumentException("One of the transactions is already paired");
             }
-            refunded = refunded.add(refund.getAmount());
-        }
-        if (purchase.getAmount().abs().compareTo(refunded) != 0) {
-            throw new IllegalArgumentException("The refunds must add up to the purchase exactly");
+            requireUnreservedCategory(leg);
         }
         UUID group = UUID.randomUUID();
         Long refundCategory = refundCategoryId();
-        List<Transaction> legs = new ArrayList<>();
-        legs.add(transactions.save(purchase.toBuilder()
-                .nature(TransactionNature.REFUND).refundGroupId(group)
-                .categoryId(refundCategory).build()));
-        for (Transaction refund : refunds) {
-            legs.add(transactions.save(refund.toBuilder()
-                    .nature(TransactionNature.REFUND).refundGroupId(group)
-                    .categoryId(refundCategory).build()));
-        }
-        return legs;
+        return legs.stream()
+                .map(leg -> transactions.save(leg.toBuilder()
+                        .nature(TransactionNature.REFUND).refundGroupId(group)
+                        .categoryId(refundCategory).build()))
+                .toList();
     }
 
     /**
-     * Reverts a refund pair: both legs become a normal income/expense again (nature by signed
-     * amount, category cleared, group removed). Returns the reverted legs.
+     * Reverts a refund: every leg of its group becomes a normal income/expense again (nature by
+     * signed amount, category cleared, group removed). Returns the reverted legs.
      */
     @Transactional
     public List<Transaction> unpairRefund(Long transactionId) {
@@ -413,6 +392,24 @@ public class TransactionEditService {
         if (category.isSystem()) {
             throw new IllegalArgumentException("Category '" + category.getName()
                     + "' is reserved and cannot be assigned by hand; link the transactions instead");
+        }
+    }
+
+    /**
+     * Refuses a transaction that already wears a reserved category without belonging to a pair. The
+     * paired guard cannot see that state, because the group id is absent — and a row carrying the
+     * label but no group reads as linked everywhere while still counting towards the statistics.
+     */
+    private void requireUnreservedCategory(Transaction transaction) {
+        Long categoryId = transaction.getCategoryId();
+        if (categoryId == null) {
+            return;
+        }
+        Category category = categories.findById(categoryId).orElse(null);
+        if (category != null && category.isSystem()) {
+            throw new IllegalArgumentException("Transaction " + transaction.getId()
+                    + " carries the reserved category '" + category.getName()
+                    + "'; unlink it before linking it again");
         }
     }
 

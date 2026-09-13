@@ -1,4 +1,5 @@
 import type { TransactionListParams, TransactionSortKey } from '../../api/endpoints'
+import { modeForRange, type DateMode } from '../../lib/date'
 import type { TransactionNature } from '../../types'
 
 /** Current sort of the transactions list. */
@@ -17,12 +18,21 @@ export interface TxFilters {
   nature?: TransactionNature
   from?: string
   to?: string
+  /**
+   * Whether the dates above are being written as one calendar month or as a day range. It is a
+   * view of the same dates rather than a filter of its own, so it is left out of {@link hasFilters}.
+   */
+  dateMode: DateMode
   q: string
   /** An explicit set of rows, set by drilling into a suggested pair; empty means no constraint. */
   ids?: number[]
+  /** One merchant, set by drilling into the merchant chart; undefined means no constraint. */
+  merchant?: string
+  /** Set by drilling into the merchants the statistics could not attribute; selects rows with none. */
+  withoutMerchant?: boolean
 }
 
-export const emptyFilters: TxFilters = { uncategorized: false, q: '' }
+export const emptyFilters: TxFilters = { uncategorized: false, q: '', dateMode: 'month' }
 
 /**
  * The natures a filter may carry, which are the ones the filter bar offers. Linked transfers and
@@ -37,9 +47,10 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
   const natureValue = nature && NATURES.includes(nature) ? nature : undefined
   const accountId = searchParams.get('accountId')
   const categoryId = searchParams.get('categoryId')
-  const from = searchParams.get('from')
-  const to = searchParams.get('to')
+  const from = searchParams.get('from') ?? null
+  const to = searchParams.get('to') ?? null
   const ids = searchParams.getAll('ids').filter((id) => /^\d+$/.test(id)).map(Number)
+  const merchant = searchParams.get('merchant')
   return {
     accountId: accountId && /^\d+$/.test(accountId) ? Number(accountId) : undefined,
     categoryId: categoryId && /^\d+$/.test(categoryId) ? Number(categoryId) : undefined,
@@ -47,8 +58,11 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
     nature: natureValue,
     from: from ?? undefined,
     to: to ?? undefined,
+    dateMode: modeForRange({ from, to }),
     q: '',
     ids: ids.length > 0 ? ids : undefined,
+    merchant: merchant === null ? undefined : merchant,
+    withoutMerchant: searchParams.get('withoutMerchant') === 'true' ? true : undefined,
   }
 }
 
@@ -86,6 +100,8 @@ export function toListParams(
     to: filters.to || undefined,
     q: filters.ids && filters.ids.length > 0 ? undefined : filters.q || undefined,
     ids: filters.ids && filters.ids.length > 0 ? filters.ids : undefined,
+    merchant: filters.merchant,
+    withoutMerchant: filters.withoutMerchant ? true : undefined,
     ...(sort ? { sort: sort.key, order: sort.dir } : {}),
     page,
     size,
@@ -95,5 +111,6 @@ export function toListParams(
 export function hasFilters(filters: TxFilters): boolean {
   return filters.accountId !== undefined || filters.categoryId !== undefined || filters.uncategorized ||
     filters.nature !== undefined || filters.from !== undefined || filters.to !== undefined ||
-    filters.q !== '' || filters.ids !== undefined
+    filters.q !== '' || filters.ids !== undefined || filters.merchant !== undefined ||
+    filters.withoutMerchant === true
 }

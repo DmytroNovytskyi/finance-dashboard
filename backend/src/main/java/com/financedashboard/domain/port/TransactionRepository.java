@@ -39,6 +39,14 @@ public interface TransactionRepository {
      */
     List<Transaction> findStatistical(LocalDate from, LocalDate to, Collection<Long> accountIds);
 
+    /**
+     * Returns the refund legs with a transaction date within the inclusive range (bounds optional),
+     * restricted to the given accounts, oldest first. {@code null} bounds or accountIds mean no
+     * restriction. Their nature excludes them from {@link #findStatistical}, but the statistics fold
+     * each group back in as its net, so they have to be read separately.
+     */
+    List<Transaction> findRefunds(LocalDate from, LocalDate to, Collection<Long> accountIds);
+
     /** Returns transactions belonging to any of the given transfer groups. */
     List<Transaction> findByTransferGroupIds(Collection<UUID> transferGroupIds);
 

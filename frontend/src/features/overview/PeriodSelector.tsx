@@ -1,42 +1,60 @@
-import Box from '@mui/material/Box'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
-import { DATE_RANGE_PRESETS, rangeForPreset, type DateRange, type DateRangePreset } from '../../lib/date'
-import { formatDate } from '../../lib/format'
+import { CurrencySelect } from '../../components/CurrencySelect'
+import { DateRangeControl } from '../../components/DateRangeControl'
+import { DATE_RANGE_PRESETS, modeForRange, rangeForPreset, type DateRangePreset } from '../../lib/date'
+import { useDisplayCurrency } from '../preferences/displayCurrency'
+import {
+  GRANULARITY_OPTIONS,
+  type PeriodSelection,
+  type TrendGranularity,
+} from '../preferences/statisticsPreferences'
+
+export type { PeriodSelection }
 
 interface PeriodSelectorProps {
-  preset: DateRangePreset
-  range: DateRange
-  onChange: (preset: DateRangePreset, range: DateRange) => void
+  period: PeriodSelection
+  granularity: TrendGranularity
+  onChange: (period: PeriodSelection) => void
+  onGranularityChange: (granularity: TrendGranularity) => void
 }
 
-function describeRange(range: DateRange): string {
-  if (!range.from && !range.to) return 'All time'
-  const from = range.from ? formatDate(range.from) : 'start'
-  const to = range.to ? formatDate(range.to) : 'today'
-  return `${from} – ${to}`
-}
+/**
+ * The statistics toolbar, identical on the overview and the trends because every control on it
+ * means the same thing on both: the period, how it is written, how charts divide it, and the
+ * currency the figures are reported in. Each one is shared, so changing it on one page changes the
+ * other — they are two views of one selection, not two independent screens.
+ *
+ * Choosing a preset moves the date control to whichever mode reads that span most naturally —
+ * "Last month" is one whole month, "This year" is not — and editing the control directly drops the
+ * preset, since the period is then no longer one of the named spans.
+ */
+export function PeriodSelector({
+  period,
+  granularity,
+  onChange,
+  onGranularityChange,
+}: PeriodSelectorProps) {
+  const { displayCurrency, setDisplayCurrency } = useDisplayCurrency()
 
-/** Row that selects the statistics period: a preset or an explicit custom range. */
-export function PeriodSelector({ preset, range, onChange }: PeriodSelectorProps) {
-  const custom = preset === 'custom'
-  const pickPreset = (value: DateRangePreset) => {
-    if (value === 'custom') {
-      const seed = range.from ? range : rangeForPreset('thisYear')
-      onChange('custom', seed)
-    } else {
-      onChange(value, rangeForPreset(value))
+  const pickPreset = (preset: DateRangePreset) => {
+    if (preset === 'custom') {
+      const seeded = period.range.from || period.range.to ? period.range : rangeForPreset('thisYear')
+      onChange({ preset, range: seeded, mode: period.mode })
+      return
     }
+    const range = rangeForPreset(preset)
+    onChange({ preset, range, mode: modeForRange(range) })
   }
+
   return (
     <Paper variant="outlined" sx={{ px: 2, py: 1.5, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
       <TextField
         select
         size="small"
         label="Period"
-        value={preset}
+        value={period.preset}
         onChange={(event) => pickPreset(event.target.value as DateRangePreset)}
         sx={{ minWidth: 180 }}
       >
@@ -47,28 +65,29 @@ export function PeriodSelector({ preset, range, onChange }: PeriodSelectorProps)
         ))}
         <MenuItem value="custom">Custom range</MenuItem>
       </TextField>
-      {custom ? (
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          <TextField
-            type="date"
-            size="small"
-            label="From"
-            value={range.from ?? ''}
-            onChange={(event) => onChange('custom', { ...range, from: event.target.value || null })}
-          />
-          <TextField
-            type="date"
-            size="small"
-            label="To"
-            value={range.to ?? ''}
-            onChange={(event) => onChange('custom', { ...range, to: event.target.value || null })}
-          />
-        </Box>
-      ) : (
-        <Typography variant="body2" color="text.secondary">
-          {describeRange(range)}
-        </Typography>
-      )}
+
+      <DateRangeControl
+        mode={period.mode}
+        range={period.range}
+        onChange={(mode, range) => onChange({ preset: 'custom', range, mode })}
+      />
+
+      <TextField
+        select
+        size="small"
+        label="Granularity"
+        value={granularity}
+        onChange={(event) => onGranularityChange(event.target.value as TrendGranularity)}
+        sx={{ minWidth: 160 }}
+      >
+        {GRANULARITY_OPTIONS.map((option) => (
+          <MenuItem key={option.value} value={option.value}>
+            {option.label}
+          </MenuItem>
+        ))}
+      </TextField>
+
+      <CurrencySelect value={displayCurrency} onChange={setDisplayCurrency} />
     </Paper>
   )
 }

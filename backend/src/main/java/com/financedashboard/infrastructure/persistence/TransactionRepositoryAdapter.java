@@ -13,6 +13,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.time.LocalDate;
@@ -90,6 +91,27 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
         Specification<TransactionEntity> spec = (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
             predicates.add(cb.not(root.get("nature").in(TransactionNature.excludedFromStatistics())));
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("transactionDate"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("transactionDate"), to));
+            }
+            if (accountIds != null) {
+                predicates.add(root.get("accountId").in(accountIds));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        List<TransactionEntity> entities = jpa.findAll(spec,
+                Sort.by(Sort.Order.asc("transactionDate"), Sort.Order.asc("id")));
+        return mapper.toDomain(entities);
+    }
+
+    @Override
+    public List<Transaction> findRefunds(LocalDate from, LocalDate to, Collection<Long> accountIds) {
+        Specification<TransactionEntity> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("nature"), TransactionNature.REFUND));
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("transactionDate"), from));
             }
@@ -238,6 +260,13 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("description")), like),
                         cb.like(cb.lower(root.get("merchant")), like)));
+            }
+            if (filter.merchant() != null) {
+                predicates.add(cb.equal(cb.trim(root.<String>get("merchant")), filter.merchant().trim()));
+            }
+            if (Boolean.TRUE.equals(filter.withoutMerchant())) {
+                Expression<String> merchant = cb.trim(root.<String>get("merchant"));
+                predicates.add(cb.or(cb.isNull(root.get("merchant")), cb.equal(merchant, "")));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };

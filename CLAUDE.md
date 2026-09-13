@@ -37,7 +37,9 @@ REST API base path is `/api/v1`. All source lives in `backend/src/main/java`,
 - Doc comments on declarations only — no inline comments in code bodies.
 - All project artifacts in English; chat may be in Russian.
 - Amounts are signed (expense negative, income positive). Internal transfers are
-  `nature=TRANSFER` and are excluded from all statistics.
+  `nature=TRANSFER` and are excluded from all statistics. Refund legs are `nature=REFUND`; they are
+  excluded as rows, but each group's net is folded back in once, on its last leg, under the reserved
+  Refund category.
 
 ## Testing requirement
 

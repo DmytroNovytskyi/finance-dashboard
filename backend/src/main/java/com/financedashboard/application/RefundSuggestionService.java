@@ -137,8 +137,11 @@ public class RefundSuggestionService {
     }
 
     private static boolean pairQuietly(TransactionEditService refunds, SuggestedRefund suggestion) {
+        List<Long> ids = new ArrayList<>();
+        ids.add(suggestion.purchaseTransactionId());
+        ids.addAll(suggestion.refundTransactionIds());
         try {
-            refunds.pairRefund(suggestion.purchaseTransactionId(), suggestion.refundTransactionIds());
+            refunds.pairRefund(ids);
             return true;
         } catch (IllegalArgumentException | NotFoundException alreadyPairedOrGone) {
             return false;

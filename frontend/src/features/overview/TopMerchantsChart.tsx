@@ -5,27 +5,32 @@ import { categoricalPalette, chartInk, useScheme } from '../../theme'
 import { formatCompact, formatInteger, formatMoneyMagnitude } from '../../lib/format'
 import { ChartTooltipCard } from '../../components/ChartTooltip'
 import { EmptyState } from '../../components/EmptyState'
+import type { Direction } from './MetricToggle'
 
 const MAX_ROWS = 7
 
 interface TopMerchantsChartProps {
   topMerchants: StatisticsByMerchant[]
   baseCurrency: string
+  direction: Direction
+  /** Called with the merchant behind a bar, so the chart can drill through like the donut does. */
+  onSelect: (merchant: string) => void
 }
 
 interface MerchantDatum {
   merchant: string
   count: number
-  expense: number
+  value: number
 }
 
 interface MerchantTooltipProps {
   active?: boolean
   payload?: { payload?: MerchantDatum }[]
   baseCurrency: string
+  direction: Direction
 }
 
-function MerchantTooltip({ active, payload, baseCurrency }: MerchantTooltipProps) {
+function MerchantTooltip({ active, payload, baseCurrency, direction }: MerchantTooltipProps) {
   if (!active || !payload?.length) return null
   const row = payload[0].payload
   if (!row) return null
@@ -34,29 +39,45 @@ function MerchantTooltip({ active, payload, baseCurrency }: MerchantTooltipProps
       title={row.merchant}
       rows={[
         { label: 'Transactions', value: formatInteger(row.count) },
-        { label: 'Spend', value: formatMoneyMagnitude(row.expense, baseCurrency) },
+        {
+          label: direction === 'expense' ? 'Spend' : 'Income',
+          value: formatMoneyMagnitude(row.value, baseCurrency),
+        },
       ]}
     />
   )
 }
 
-/** Spending by merchant, ranked — every bar carries the same series color. */
-export function TopMerchantsChart({ topMerchants, baseCurrency }: TopMerchantsChartProps) {
+/** Money by merchant, ranked — every bar carries the same series color. */
+export function TopMerchantsChart({
+  topMerchants,
+  baseCurrency,
+  direction,
+  onSelect,
+}: TopMerchantsChartProps) {
   const scheme = useScheme()
   const ink = chartInk[scheme]
   const series = categoricalPalette[scheme][0]
-  const data = topMerchants
-    .filter((merchant) => merchant.expense > 0)
-    .map((merchant) => ({ ...merchant, expense: Math.abs(merchant.expense) }))
-    .sort((a, b) => a.expense - b.expense)
+  const rows = topMerchants
+    .filter((merchant) => merchant[direction] > 0)
+    .map((merchant) => ({
+      merchant: merchant.merchant,
+      count: merchant.count,
+      value: Math.abs(merchant[direction]),
+    }))
+    .sort((a, b) => a.value - b.value)
     .slice(-MAX_ROWS)
-  if (data.length === 0) {
-    return <EmptyState title="No merchant spending in this period" />
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title={direction === 'expense' ? 'No merchant spending in this period' : 'No merchant income in this period'}
+      />
+    )
   }
   return (
     <Box sx={{ height: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid horizontal={false} stroke={ink.grid} />
           <XAxis
             type="number"
@@ -75,8 +96,23 @@ export function TopMerchantsChart({ topMerchants, baseCurrency }: TopMerchantsCh
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<MerchantTooltip baseCurrency={baseCurrency} />} cursor={{ fill: ink.grid, opacity: 0.35 }} />
-          <Bar dataKey="expense" name="Spend" fill={series} radius={[0, 4, 4, 0]} maxBarSize={18} />
+          <Tooltip
+            content={<MerchantTooltip baseCurrency={baseCurrency} direction={direction} />}
+            cursor={{ fill: ink.grid, opacity: 0.35 }}
+          />
+          <Bar
+            dataKey="value"
+            name={direction === 'expense' ? 'Spend' : 'Income'}
+            fill={series}
+            radius={[0, 4, 4, 0]}
+            maxBarSize={18}
+            cursor="pointer"
+            isAnimationActive={false}
+            onClick={(_entry: unknown, index: number) => {
+              const row = rows[index]
+              if (row) onSelect(row.merchant)
+            }}
+          />
         </BarChart>
       </ResponsiveContainer>
     </Box>

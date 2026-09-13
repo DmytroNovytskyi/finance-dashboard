@@ -8,6 +8,7 @@ import com.financedashboard.web.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
 
@@ -78,12 +79,13 @@ class StatisticsApiTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void excludesRefundsFromTotals() throws Exception {
+    void excludesABalancedRefundGroupFromTotals() throws Exception {
         long account = insertAccount("PLN", null);
         long statement = insertStatement(account, "h3r");
+        long purchase = insertTx(statement, account, "2026-03-12", "-250", "REFUND", null, "Example Shop");
+        long credit = insertTx(statement, account, "2026-03-12", "250", "REFUND", null, null);
+        linkAsRefund(UUID.randomUUID(), purchase, credit);
         insertTx(statement, account, "2026-03-10", "-100", "EXPENSE", null, "Example Store");
-        insertTx(statement, account, "2026-03-12", "-250", "REFUND", null, "Example Shop");
-        insertTx(statement, account, "2026-03-12", "250", "REFUND", null, null);
 
         mockMvc.perform(get("/api/v1/statistics/summary")
                         .param("from", "2026-03-01")
@@ -93,6 +95,44 @@ class StatisticsApiTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.totals.expense").value(100.0))
                 .andExpect(jsonPath("$.totals.net").value(-100.0))
                 .andExpect(jsonPath("$.totals.count").value(1));
+    }
+
+    @Test
+    void foldsAnUnbalancedRefundGroupIntoOneRowOnItsLastLeg() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "h3f");
+        long refundCategory = insertCategory("Refund");
+        long januaryCredit = insertTx(statement, account, "2026-01-18", "500", "REFUND", refundCategory, "Example Payee");
+        long februaryCredit = insertTx(statement, account, "2026-02-18", "2500", "REFUND", refundCategory, "Example Payee");
+        long firstPayment = insertTx(statement, account, "2026-02-19", "-1000", "REFUND", refundCategory, "Example Payee");
+        long secondPayment = insertTx(statement, account, "2026-02-19", "-1000", "REFUND", refundCategory, "Example Payee");
+        linkAsRefund(UUID.randomUUID(), januaryCredit, februaryCredit, firstPayment, secondPayment);
+
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("from", "2026-02-01")
+                        .param("to", "2026-02-28"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.income").value(500.0))
+                .andExpect(jsonPath("$.totals.expense").value(0.0))
+                .andExpect(jsonPath("$.totals.net").value(500.0))
+                .andExpect(jsonPath("$.totals.count").value(3))
+                .andExpect(jsonPath("$.byMonth[0].month").value("2026-02"))
+                .andExpect(jsonPath("$.byCategory[0].categoryName").value("Refund"))
+                .andExpect(jsonPath("$.byCategory[0].income").value(500.0));
+
+        // Only the January leg falls in this range, so it folds to its own net and date.
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("from", "2026-01-01")
+                        .param("to", "2026-01-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.income").value(500.0))
+                .andExpect(jsonPath("$.totals.count").value(1));
+    }
+
+    private void linkAsRefund(UUID group, long... transactionIds) {
+        for (long id : transactionIds) {
+            jdbcTemplate.update("update transaction set refund_group_id = ? where id = ?", group, id);
+        }
     }
 
     @Test
