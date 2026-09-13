@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 
@@ -50,10 +50,14 @@ export function PageShell({ children }: { children: ReactNode }) {
  * The flexible region of a page. It takes whatever height the fixed regions above leave; content
  * that wants to fill that space uses `flex: '1 0 auto'` with a minHeight, so it stretches on a
  * tall window and the region scrolls on its own when it cannot fit — the window never does.
+ *
+ * The ref is for the pages whose content is sized from this region's height rather than by its own
+ * content — a grid of cards that must fill the space has to know how much space that is.
  */
-export function PageScroll({ children }: { children: ReactNode }) {
+export function PageScroll({ children, ref }: { children: ReactNode; ref?: Ref<HTMLDivElement> }) {
   return (
     <Box
+      ref={ref}
       sx={{
         flex: 1,
         minHeight: 0,

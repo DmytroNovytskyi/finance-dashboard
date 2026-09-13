@@ -1,6 +1,8 @@
+import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { useAccountsById, useStatementCoverage } from '../api/queries'
 import { formatDate, formatDateRange, formatInteger } from '../lib/format'
@@ -16,8 +18,7 @@ function coverageSummary(coverage: StatementCoverage): string {
   if (coverage.earliestPeriodStart === null || coverage.latestPeriodEnd === null) {
     return 'No statements imported yet.'
   }
-  const range = formatDateRange(coverage.earliestPeriodStart, coverage.latestPeriodEnd)
-  return `${range} · ${formatInteger(coverage.statementCount)} statements`
+  return formatDateRange(coverage.earliestPeriodStart, coverage.latestPeriodEnd)
 }
 
 /** Describes what is missing for an account, or null when its coverage is complete. */
@@ -56,13 +57,17 @@ export function StatementFreshness() {
 
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           Statement freshness
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          How far each account&apos;s imported statements reach.
-        </Typography>
+        <Tooltip
+          title="How far each account's imported statements reach."
+          placement="right"
+          slotProps={{ popper: { modifiers: [{ name: 'offset', options: { offset: [0, -6] } }] } }}
+        >
+          <InfoOutlined fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0 }} />
+        </Tooltip>
       </Box>
 
       {stale.length > 0 ? (

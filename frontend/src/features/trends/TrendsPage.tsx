@@ -31,6 +31,7 @@ import { SeriesLegend } from '../../components/SeriesLegend'
 import { StatementFreshness } from '../../components/StatementFreshness'
 import type { CategoryPresentation } from '../../api/queries'
 import type { StatisticsCategorySeriesPoint, StatisticsGranularity, StatisticsTrendPoint } from '../../types'
+import { useFittingCardHeight } from '../../hooks/useFittingCardHeight'
 import { useDisplayCurrency, type DisplayCurrency } from '../preferences/displayCurrency'
 import {
   granularityLabel,
@@ -42,6 +43,21 @@ import { PeriodSelector } from '../overview/PeriodSelector'
 
 /** Kept under its original name so the saved category chart choice survives the rename. */
 const TRENDS_STORAGE_KEY = 'finance-dashboard.categories.v1'
+
+/** Cards per row once the window is wide enough for two, and how many such rows fill the region. */
+const CARDS_PER_ROW = 2
+const VISIBLE_ROWS = 2
+
+/** MUI multiplies grid spacing by 8, and the fit has to be worked out from the same gap it leaves. */
+const GRID_SPACING = 2
+const GRID_GAP = GRID_SPACING * 8
+
+/**
+ * Floor for the plot inside a card. A card is sized to fill its row rather than by its content, so
+ * this is what keeps the plot legible on a short window — and it is deliberately far below what a
+ * two-row fit gives, since a floor above the row would push the card past the height it was given.
+ */
+const TREND_CHART_MIN_HEIGHT = 120
 
 interface StoredTrendsState {
   categories?: unknown
@@ -158,6 +174,8 @@ export function TrendsPage() {
     }
   }, [categoryIds])
 
+  const { containerRef: cardsContainerRef, cardHeight } = useFittingCardHeight(VISIBLE_ROWS, GRID_GAP)
+
   return (
     <PageShell>
       <PageHeader
@@ -223,15 +241,15 @@ export function TrendsPage() {
         ))}
       </Paper>
 
-      <PageScroll>
+      <PageScroll ref={cardsContainerRef}>
         {selected.length === 0 ? (
           <Paper variant="outlined" sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">Add a category above to chart its income and expenses over time.</Typography>
           </Paper>
         ) : (
-          <Grid container spacing={2}>
+          <Grid container spacing={GRID_SPACING}>
             {selected.map((category) => (
-              <Grid key={category.id} size={12}>
+              <Grid key={category.id} size={{ xs: 12, lg: 12 / CARDS_PER_ROW }} sx={{ height: cardHeight }}>
                 {granularity !== 'transaction' ? (
                   <CategoryTrendCard category={category} range={period.range} granularity={granularity} displayCurrency={displayCurrency} />
                 ) : (
@@ -339,9 +357,9 @@ function CategorySeriesCard({
     <ChartCard
       title={category.name}
       subtitle={`in ${baseCurrency} · each point is one transaction`}
-      action={legend.length > 1 ? <SeriesLegend items={legend} /> : null}
+      action={legend.length > 0 ? <SeriesLegend items={legend} /> : null}
       meta={points.length > 0 ? <StatStrip stats={stats} currency={baseCurrency} countLabel="Transactions" /> : null}
-      chartHeight={320}
+      chartHeight={TREND_CHART_MIN_HEIGHT}
     >
       {points.length === 0 ? (
         <EmptyState title={`Nothing for ${category.name} in this period`} hint="Pick a wider period or another category." />
@@ -438,9 +456,9 @@ function CategoryTrendCard({
     <ChartCard
       title={category.name}
       subtitle={`in ${baseCurrency} · ${granularityLabel(granularity).toLowerCase()} buckets`}
-      action={legend.length > 1 ? <SeriesLegend items={legend} /> : null}
+      action={legend.length > 0 ? <SeriesLegend items={legend} /> : null}
       meta={data.length > 0 ? <StatStrip stats={stats} currency={baseCurrency} countLabel="Periods" /> : null}
-      chartHeight={320}
+      chartHeight={TREND_CHART_MIN_HEIGHT}
     >
       {data.length === 0 ? (
         <EmptyState title={`Nothing for ${category.name} in this period`} hint="Pick a wider period or another category." />

@@ -6,7 +6,11 @@ export interface SeriesLegendItem {
   color: string
 }
 
-/** Compact inline legend for a chart with two or more series. */
+/**
+ * Compact inline legend naming each series and its colour. It is shown for a single series too:
+ * which one a chart draws is not obvious from the line alone, and the colour is the same key the
+ * category donut and the trend chart use.
+ */
 export function SeriesLegend({ items }: { items: SeriesLegendItem[] }) {
   return (
     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>

@@ -38,6 +38,16 @@ const NO_MERCHANT = '(no merchant)'
 
 const DEFAULT_DIRECTION: Direction = 'expense'
 
+/**
+ * How the donut and the merchant chart share their row: side by side from `lg` up, stacked below
+ * it. The `nowrap` is load-bearing rather than cosmetic. A **wrapping** flex line is sized to its
+ * tallest item's content, so under `wrap` the category list sets the row's height instead of being
+ * bounded by it — a dozen categories made the card 486px tall inside a 383px row, and the 103px it
+ * spilled pushed a scrollbar onto the page. With `nowrap` the row's height is definite, the card
+ * takes it, and the list scrolls inside the card the way its own `overflow` always intended.
+ */
+const CHART_ROW_WRAP = { xs: 'wrap', lg: 'nowrap' } as const
+
 interface StoredOverviewState {
   categoryMetric?: unknown
   merchantMetric?: unknown
@@ -293,8 +303,8 @@ export function OverviewPage() {
           </ChartCard>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flex: '1 1 0', minHeight: 140 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: CHART_ROW_WRAP, flex: '1 1 0', minHeight: 140 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0, minHeight: 0 }}>
             <ChartCard
               title={categoryMetric === 'expense' ? 'Spend by category' : 'Income by category'}
               subtitle="Click a slice to see the transactions"
@@ -315,9 +325,9 @@ export function OverviewPage() {
               />
             </ChartCard>
           </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 320px', minWidth: 0, minHeight: 0 }}>
             <ChartCard
-              title={merchantMetric === 'expense' ? 'Top merchants' : 'Top merchants by income'}
+              title={merchantMetric === 'expense' ? 'Spend by merchant' : 'Income by merchant'}
               subtitle="Click a bar to see the transactions"
               action={
                 <MetricToggle
