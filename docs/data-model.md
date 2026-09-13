@@ -52,16 +52,25 @@ the user may rename any of them.
 
 ## `merchant_rule`
 
-A user-managed default that auto-tags imported transactions by counterparty. Matching is exact on
-a normalized key (uppercased, whitespace collapsed); a rule applies to future imports and, on the
-`apply` action, to already-imported uncategorized rows.
+A user-managed default that auto-tags imported transactions by counterparty. Both the rule's text
+and the counterparty are compared normalized (trimmed, uppercased, whitespace collapsed), so case
+and spacing never matter; `match_type` says how the two are compared. A rule applies to future
+imports and, on the `apply` action, to already-imported uncategorized rows.
 
 | column | type | notes |
 |---|---|---|
 | id | bigserial PK | |
 | merchant | varchar not null unique | normalized counterparty, e.g. `EXAMPLE MERCHANT` |
+| match_type | varchar(16) not null default `EQUALS` | `EQUALS` / `STARTS_WITH` / `CONTAINS` |
 | category_id | bigint FK → category not null | on delete cascade — deleting a category drops its rules |
 | created_at / updated_at | timestamptz | |
+
+V7 adds `match_type`. The `EQUALS` default is what makes it a no-op for rules stored before it:
+every one of them was written when matching could only be exact, so they read back as `EQUALS` and
+claim exactly the transactions they always did. `merchant` stays unique — a rule is one rule per
+counterparty text, and the match type says how that text is read, not which rule it is. Several
+rules may still claim the same counterparty, and the narrowest wins; see
+`docs/architecture.md` for the resolution order.
 
 ## `bank_statement`
 

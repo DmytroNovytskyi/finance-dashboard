@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { categoriesApi, merchantRulesApi, transactionsApi } from '../../api/endpoints'
 import { queryKeys } from '../../api/keys'
+import type { MatchType } from '../../types'
 
 function useInvalidate(...keys: ReadonlyArray<readonly string[]>) {
   const queryClient = useQueryClient()
@@ -132,8 +133,8 @@ export function useMerchantRules() {
 export function useCreateMerchantRule() {
   const invalidate = useInvalidate(queryKeys.merchantRules)
   return useMutation({
-    mutationFn: ({ merchant, categoryId }: { merchant: string; categoryId: number }) =>
-      merchantRulesApi.create({ merchant, categoryId }),
+    mutationFn: ({ merchant, categoryId, matchType }: { merchant: string; categoryId: number; matchType: MatchType }) =>
+      merchantRulesApi.create({ merchant, categoryId, matchType }),
     onSuccess: invalidate,
   })
 }

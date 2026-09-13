@@ -2,7 +2,9 @@ package com.financedashboard.application;
 
 import com.financedashboard.application.exception.NotFoundException;
 import com.financedashboard.domain.category.Category;
+import com.financedashboard.domain.merchant_rule.MatchType;
 import com.financedashboard.domain.merchant_rule.MerchantRule;
+import com.financedashboard.domain.merchant_rule.MerchantRuleMatcher;
 import com.financedashboard.domain.port.CategoryRepository;
 import com.financedashboard.domain.port.MerchantRuleRepository;
 import com.financedashboard.domain.port.TransactionRepository;
@@ -31,6 +33,7 @@ public class MerchantRuleService {
     public record RuleDetail(
             Long id,
             String merchant,
+            MatchType matchType,
             Long categoryId,
             String categoryName,
             String color) {
@@ -49,9 +52,12 @@ public class MerchantRuleService {
      * Creates a rule for the normalized merchant and category; duplicates are rejected. A reserved
      * category is refused: a default tagging rows with one would dress every match up as a linked
      * leg that no pairing flow ever created, and it would do so in bulk on the next apply.
+     *
+     * <p>A null {@code matchType} is exact matching, which is what a client that predates match
+     * types sends and what every rule stored before them means.
      */
     @Transactional
-    public RuleDetail create(String merchant, Long categoryId) {
+    public RuleDetail create(String merchant, Long categoryId, MatchType matchType) {
         String key = normalize(merchant);
         if (key.isEmpty()) {
             throw new IllegalArgumentException("merchant must not be blank");
@@ -62,6 +68,7 @@ public class MerchantRuleService {
         }
         MerchantRule saved = rules.save(MerchantRule.builder()
                 .merchant(key)
+                .matchType(matchType == null ? MatchType.EQUALS : matchType)
                 .categoryId(categoryId)
                 .build());
         return detail(saved, category);
@@ -76,7 +83,7 @@ public class MerchantRuleService {
     public int unlink(Long id) {
         MerchantRule rule = rules.findById(id)
                 .orElseThrow(() -> new NotFoundException("Merchant rule " + id + " not found"));
-        return revertTagged(Map.of(rule.getMerchant(), rule.getCategoryId()));
+        return revertTagged(List.of(rule));
     }
 
     /**
@@ -95,9 +102,9 @@ public class MerchantRuleService {
      * Uncategorizes every categorized, non-transfer transaction tagged through the given
      * merchant-to-category links. Returns how many rows were reverted.
      */
-    private int revertTagged(Map<String, Long> categoryByMerchant) {
+    private int revertTagged(List<MerchantRule> candidates) {
         List<Transaction> reverted = transactions.findCategorized().stream()
-                .filter(transaction -> usesLink(transaction, categoryByMerchant))
+                .filter(transaction -> usesLink(transaction, candidates))
                 .map(transaction -> transaction.toBuilder().categoryId(null).build())
                 .toList();
         if (!reverted.isEmpty()) {
@@ -117,19 +124,17 @@ public class MerchantRuleService {
         if (all.isEmpty()) {
             return new ClearAllResult(0, 0);
         }
-        Map<String, Long> categoryByMerchant = all.stream()
-                .collect(Collectors.toMap(MerchantRule::getMerchant, MerchantRule::getCategoryId));
         for (MerchantRule rule : all) {
             rules.deleteById(rule.getId());
         }
-        return new ClearAllResult(all.size(), revertTagged(categoryByMerchant));
+        return new ClearAllResult(all.size(), revertTagged(all));
     }
 
-    private static boolean usesLink(Transaction transaction, Map<String, Long> categoryByMerchant) {
+    private static boolean usesLink(Transaction transaction, List<MerchantRule> candidates) {
         if (transaction.getMerchant() == null || transaction.getCategoryId() == null) {
             return false;
         }
-        Long ruleCategory = categoryByMerchant.get(normalize(transaction.getMerchant()));
+        Long ruleCategory = MerchantRuleMatcher.categoryFor(normalize(transaction.getMerchant()), candidates);
         return ruleCategory != null && ruleCategory.equals(transaction.getCategoryId());
     }
 
@@ -139,33 +144,32 @@ public class MerchantRuleService {
 
     /**
      * Applies every rule to the current uncategorized, non-transfer transactions whose merchant
-     * matches exactly (case- and spacing-insensitively). Returns how many rows were categorized.
+     * matches it, by the rule's own {@link MatchType}. Returns how many rows were categorized.
      */
     @Transactional
     public int applyToUncategorized() {
-        Map<String, Long> categoryByMerchant = rules.findAll().stream()
-                .collect(Collectors.toMap(MerchantRule::getMerchant, MerchantRule::getCategoryId));
-        if (categoryByMerchant.isEmpty()) {
+        List<MerchantRule> all = rules.findAll();
+        if (all.isEmpty()) {
             return 0;
         }
-        List<Transaction> changed = transactions.findUncategorized().stream()
-                .map(transaction -> apply(transaction, categoryByMerchant))
-                .filter(transaction -> transaction != null)
-                .toList();
-        if (!changed.isEmpty()) {
-            transactions.saveAll(changed);
-        }
-        return changed.size();
+        return applyTo(all);
     }
 
-    /** Applies the single rule to the uncategorized rows that match its merchant; returns the count. */
+    /**
+     * Applies the single rule to the uncategorized rows its merchant matches; returns the count.
+     * Only this rule is considered, so a broader rule that also claims those rows does not decide
+     * the outcome of applying this one.
+     */
     @Transactional
     public int apply(Long id) {
         MerchantRule rule = rules.findById(id)
                 .orElseThrow(() -> new NotFoundException("Merchant rule " + id + " not found"));
-        Map<String, Long> categoryByMerchant = Map.of(rule.getMerchant(), rule.getCategoryId());
+        return applyTo(List.of(rule));
+    }
+
+    private int applyTo(List<MerchantRule> candidates) {
         List<Transaction> changed = transactions.findUncategorized().stream()
-                .map(transaction -> apply(transaction, categoryByMerchant))
+                .map(transaction -> apply(transaction, candidates))
                 .filter(transaction -> transaction != null)
                 .toList();
         if (!changed.isEmpty()) {
@@ -174,12 +178,12 @@ public class MerchantRuleService {
         return changed.size();
     }
 
-    private static Transaction apply(Transaction transaction, Map<String, Long> categoryByMerchant) {
+    private static Transaction apply(Transaction transaction, List<MerchantRule> candidates) {
         String merchant = transaction.getMerchant();
         if (merchant == null || merchant.isBlank()) {
             return null;
         }
-        Long categoryId = categoryByMerchant.get(normalize(merchant));
+        Long categoryId = MerchantRuleMatcher.categoryFor(normalize(merchant), candidates);
         if (categoryId == null) {
             return null;
         }
@@ -206,7 +210,7 @@ public class MerchantRuleService {
     }
 
     private static RuleDetail detail(MerchantRule rule, Category category) {
-        return new RuleDetail(rule.getId(), rule.getMerchant(), rule.getCategoryId(),
+        return new RuleDetail(rule.getId(), rule.getMerchant(), rule.getMatchType(), rule.getCategoryId(),
                 category == null ? null : category.getName(),
                 category == null ? null : category.getColor());
     }

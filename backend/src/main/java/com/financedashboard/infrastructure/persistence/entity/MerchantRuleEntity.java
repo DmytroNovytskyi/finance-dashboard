@@ -28,6 +28,10 @@ public class MerchantRuleEntity {
     @Column(nullable = false, unique = true)
     private String merchant;
 
+    /** Stored as its enum name; the column defaults to {@code EQUALS} for rows predating match types. */
+    @Column(name = "match_type", nullable = false)
+    private String matchType;
+
     @Column(name = "category_id", nullable = false)
     private Long categoryId;
 

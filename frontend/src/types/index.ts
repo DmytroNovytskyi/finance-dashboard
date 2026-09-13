@@ -129,9 +129,16 @@ export interface StatisticsTrendPoint {
 }
 
 /** A user-managed merchant-to-category default. */
+/**
+ * How a default compares its counterparty text. `EQUALS` is exact matching, the only behaviour that
+ * existed before match types, and what a rule stored without one means.
+ */
+export type MatchType = 'EQUALS' | 'STARTS_WITH' | 'CONTAINS'
+
 export interface MerchantRule {
   id: number
   merchant: string
+  matchType: MatchType
   categoryId: number
   categoryName: string | null
   color: string | null

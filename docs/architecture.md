@@ -138,11 +138,24 @@ summed) and 404 for an unknown category.
 Merchant defaults: `GET/POST /api/v1/merchant-rules`, `DELETE /api/v1/merchant-rules/{id}`,
 `POST /api/v1/merchant-rules/{id}/unlink` (keeps the rule, reverts its rows),
 `POST /api/v1/merchant-rules/{id}/apply` (one rule), and `POST /api/v1/merchant-rules/apply`
-(all rules). A rule maps a counterparty (matched exactly, case- and spacing-insensitively) to a
-category; statement imports auto-tag matching fresh rows, and the apply actions tag the
-already-imported uncategorized rows of that counterparty on demand. Deleting a rule (or deleting
-its category) stops auto-tagging and **reverts** to uncategorized the rows it had tagged (same
-merchant and the rule's category). Deleting a category removes its rules.
+(all rules). A rule maps a counterparty to a category, and `matchType` says how the two are
+compared: `EQUALS` (the default, and the only behaviour before match types existed), `STARTS_WITH`
+or `CONTAINS`. Both sides are compared normalized — trimmed, uppercased, whitespace collapsed — so
+case and spacing never matter whichever type is used. A rule created without a `matchType` is
+`EQUALS`, which is what keeps rules stored before the feature behaving exactly as they did.
+
+Once matching stopped being exact, one counterparty could be claimed by several rules, so
+`MerchantRuleMatcher` resolves them: the narrower match type wins (`EQUALS` over `STARTS_WITH` over
+`CONTAINS`), then the longer text, then the lower id — an order independent of how the rules are
+stored, so a narrow rule can refine a broad one without deleting it.
+
+Statement imports auto-tag matching fresh rows, and the apply actions tag the already-imported
+uncategorized rows of that counterparty on demand. **Every path that resolves a counterparty goes
+through that one matcher** — the import, both apply actions, and the revert. They have to agree: a
+rule that tags rows on import but does not recognise them when deleted would leave those rows
+carrying a category with nothing to point at. Deleting a rule (or deleting its category) stops
+auto-tagging and **reverts** to uncategorized the rows it had tagged — those the matcher claims
+whose category is the rule's. Deleting a category removes its rules.
 
 Unlink actions: `POST /api/v1/categories/{id}/uncategorize` clears that category from its
 transactions (keeping the category); `POST /api/v1/merchant-rules/{id}/unlink` clears the rows a

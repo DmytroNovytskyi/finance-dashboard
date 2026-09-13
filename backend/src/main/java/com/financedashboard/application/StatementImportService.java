@@ -5,6 +5,7 @@ import com.financedashboard.domain.account.AccountNumbers;
 import com.financedashboard.domain.exception.StatementFxRateException;
 import com.financedashboard.domain.exception.UnsupportedStatementException;
 import com.financedashboard.domain.merchant_rule.MerchantRule;
+import com.financedashboard.domain.merchant_rule.MerchantRuleMatcher;
 import com.financedashboard.domain.money.FxMath;
 import com.financedashboard.domain.port.AccountRepository;
 import com.financedashboard.domain.port.BankStatementParser;
@@ -104,8 +105,7 @@ public class StatementImportService {
         List<Transaction> fresh = rows.stream()
                 .filter(tx -> !existing.contains(tx.getDedupHash()))
                 .toList();
-        Map<String, Long> ruleCategory = merchantRules.findAll().stream()
-                .collect(Collectors.toMap(MerchantRule::getMerchant, MerchantRule::getCategoryId));
+        List<MerchantRule> ruleCategory = merchantRules.findAll();
         List<Transaction> tagged = fresh.stream()
                 .map(tx -> applyMerchantRules(tx, ruleCategory))
                 .toList();
@@ -239,15 +239,15 @@ public class StatementImportService {
         return label + " •••• " + AccountNumbers.lastDigits(accountNumber, 4);
     }
 
-    private static Transaction applyMerchantRules(Transaction transaction, Map<String, Long> ruleCategory) {
-        if (ruleCategory.isEmpty() || transaction.getCategoryId() != null) {
+    private static Transaction applyMerchantRules(Transaction transaction, List<MerchantRule> candidates) {
+        if (candidates.isEmpty() || transaction.getCategoryId() != null) {
             return transaction;
         }
         String merchant = transaction.getMerchant();
         if (merchant == null || merchant.isBlank()) {
             return transaction;
         }
-        Long categoryId = ruleCategory.get(MerchantRuleService.normalize(merchant));
+        Long categoryId = MerchantRuleMatcher.categoryFor(MerchantRuleService.normalize(merchant), candidates);
         return categoryId == null ? transaction : transaction.toBuilder().categoryId(categoryId).build();
     }
 

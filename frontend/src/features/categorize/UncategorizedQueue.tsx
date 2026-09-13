@@ -15,11 +15,12 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
 import { AssignCategorySelect } from '../../components/AssignCategorySelect'
+import { MATCH_TYPE_OPTIONS } from '../../lib/matchTypes'
 import { useFittingRows } from '../../hooks/useFittingRows'
 import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { amountColor, useScheme } from '../../theme'
 import { formatDate, formatMoney } from '../../lib/format'
-import type { Transaction } from '../../types'
+import type { MatchType, Transaction } from '../../types'
 import { LinkButtons } from '../transactions/LinkActions'
 import { useLinking } from '../transactions/useLinking'
 import {
@@ -66,6 +67,7 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const [nature, setNature] = useState<QueueNature>('EXPENSE')
   const [selected, setSelected] = useState<ReadonlyMap<number, Transaction>>(new Map())
   const [remember, setRemember] = useState(false)
+  const [matchType, setMatchType] = useState<MatchType>('EQUALS')
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [sort, setSort] = useState<QueueSort>('newest')
@@ -153,11 +155,12 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
   const assignMany = (categoryId: number) => {
     if (selected.size === 0) return
     if (remember && merchant) {
-      createRule.mutate({ merchant, categoryId })
+      createRule.mutate({ merchant, categoryId, matchType })
     }
     categorizeBulk.mutate({ ids: [...selected.keys()], categoryId })
     setSelected(new Map())
     setRemember(false)
+    setMatchType('EQUALS')
   }
 
   const selectPage = (checked: boolean) => {
@@ -267,6 +270,21 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
                 }
                 sx={{ m: 0 }}
               />
+            ) : null}
+            {remember && single && merchant && !hasRule ? (
+              <Select
+                size="small"
+                value={matchType}
+                onChange={(event) => setMatchType(event.target.value as MatchType)}
+                sx={{ minWidth: 130 }}
+                inputProps={{ 'aria-label': 'How the remembered counterparty is matched' }}
+              >
+                {MATCH_TYPE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
             ) : null}
             <AssignCategorySelect
               categories={categories}

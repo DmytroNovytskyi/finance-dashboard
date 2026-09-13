@@ -36,7 +36,7 @@ public class MerchantRuleController {
     @ResponseStatus(HttpStatus.CREATED)
     public MerchantRuleResponse create(@Valid @RequestBody MerchantRuleCreateRequest request) {
         return MerchantRuleResponse.from(
-                rules.create(request.merchant(), request.categoryId()));
+                rules.create(request.merchant(), request.categoryId(), request.matchType()));
     }
 
     @PostMapping("/apply")

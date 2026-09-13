@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.financedashboard.application.exception.NotFoundException;
 import com.financedashboard.application.MerchantRuleService.RuleDetail;
 import com.financedashboard.domain.category.Category;
+import com.financedashboard.domain.merchant_rule.MatchType;
 import com.financedashboard.domain.merchant_rule.MerchantRule;
 import com.financedashboard.domain.port.CategoryRepository;
 import com.financedashboard.domain.port.MerchantRuleRepository;
@@ -53,7 +54,7 @@ class MerchantRuleServiceTest {
         when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
         when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RuleDetail created = service.create("  Example Merchant  ", CATEGORY);
+        RuleDetail created = service.create("  Example Merchant  ", CATEGORY, MatchType.EQUALS);
 
         assertThat(created.merchant()).isEqualTo("EXAMPLE MERCHANT");
         assertThat(created.categoryName()).isEqualTo("Taxes");
@@ -62,14 +63,14 @@ class MerchantRuleServiceTest {
 
     @Test
     void createRejectsBlankMerchant() {
-        assertThatThrownBy(() -> service.create("   ", CATEGORY))
+        assertThatThrownBy(() -> service.create("   ", CATEGORY, MatchType.EQUALS))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createRejectsUnknownCategory() {
         when(categories.findById(CATEGORY)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.create("Merchant", CATEGORY))
+        assertThatThrownBy(() -> service.create("Merchant", CATEGORY, MatchType.EQUALS))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -78,7 +79,7 @@ class MerchantRuleServiceTest {
         when(categories.findById(CATEGORY)).thenReturn(Optional.of(Category.builder()
                 .id(CATEGORY).name("Refund").system(true).systemKey("REFUND").build()));
 
-        assertThatThrownBy(() -> service.create("EXAMPLE SHOP", CATEGORY))
+        assertThatThrownBy(() -> service.create("EXAMPLE SHOP", CATEGORY, MatchType.EQUALS))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("reserved");
         verify(rules, never()).save(any());
@@ -88,7 +89,7 @@ class MerchantRuleServiceTest {
     void createRejectsDuplicateMerchant() {
         when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
         when(rules.existsByMerchant("EXAMPLE MERCHANT")).thenReturn(true);
-        assertThatThrownBy(() -> service.create("example merchant", CATEGORY))
+        assertThatThrownBy(() -> service.create("example merchant", CATEGORY, MatchType.EQUALS))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -232,6 +233,71 @@ class MerchantRuleServiceTest {
         when(rules.findById(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.apply(9L))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void createStoresTheMatchTypeItWasGiven() {
+        when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
+        when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RuleDetail created = service.create("Example Shop", CATEGORY, MatchType.CONTAINS);
+
+        assertThat(created.matchType()).isEqualTo(MatchType.CONTAINS);
+        ArgumentCaptor<MerchantRule> captor = ArgumentCaptor.forClass(MerchantRule.class);
+        verify(rules).save(captor.capture());
+        assertThat(captor.getValue().getMatchType()).isEqualTo(MatchType.CONTAINS);
+    }
+
+    @Test
+    void createWithoutAMatchTypeFallsBackToExactMatching() {
+        when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
+        when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.create("Example Shop", CATEGORY, null).matchType()).isEqualTo(MatchType.EQUALS);
+    }
+
+    @Test
+    void containsRuleTagsCounterpartiesThatWrapItsText() {
+        MerchantRule rule = MerchantRule.builder().merchant("EXAMPLE SHOP")
+                .matchType(MatchType.CONTAINS).categoryId(CATEGORY).build();
+        when(rules.findAll()).thenReturn(List.of(rule));
+        when(transactions.findUncategorized()).thenReturn(List.of(
+                transaction(1L, "EXAMPLE SHOP SP. Z O.O."),
+                transaction(2L, "TRANSAKCJA KARTĄ PŁATNICZĄ Example Shop Poznan"),
+                transaction(3L, "EXAMPLE MARKET")));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.applyToUncategorized()).isEqualTo(2);
+    }
+
+    @Test
+    void theNarrowerRuleDecidesWhenTwoWouldTagTheSameRow() {
+        MerchantRule broad = MerchantRule.builder().id(1L).merchant("EXAMPLE SHOP")
+                .matchType(MatchType.CONTAINS).categoryId(CATEGORY).build();
+        MerchantRule narrow = MerchantRule.builder().id(2L).merchant("EXAMPLE SHOP SP. Z O.O.")
+                .matchType(MatchType.EQUALS).categoryId(9L).build();
+        when(rules.findAll()).thenReturn(List.of(broad, narrow));
+        when(transactions.findUncategorized()).thenReturn(List.of(transaction(1L, "EXAMPLE SHOP SP. Z O.O.")));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.applyToUncategorized();
+
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(transactions).saveAll(captor.capture());
+        assertThat(captor.getValue().get(0).getCategoryId()).isEqualTo(9L);
+    }
+
+    @Test
+    void unlinkRevertsTheRowsAContainsRuleTagged() {
+        MerchantRule rule = MerchantRule.builder().id(5L).merchant("EXAMPLE SHOP")
+                .matchType(MatchType.CONTAINS).categoryId(CATEGORY).build();
+        when(rules.findById(5L)).thenReturn(Optional.of(rule));
+        Transaction wrapped = transaction(1L, "TRANSAKCJA KARTĄ EXAMPLE SHOP").toBuilder().categoryId(CATEGORY).build();
+        Transaction otherMerchant = transaction(2L, "EXAMPLE STORE").toBuilder().categoryId(CATEGORY).build();
+        when(transactions.findCategorized()).thenReturn(List.of(wrapped, otherMerchant));
+        when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.unlink(5L)).isEqualTo(1);
     }
 
     @Test

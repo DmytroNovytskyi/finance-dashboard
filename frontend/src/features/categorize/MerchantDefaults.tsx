@@ -14,8 +14,9 @@ import TextField from '@mui/material/TextField'
 import TablePagination from '@mui/material/TablePagination'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
+import { MATCH_TYPE_OPTIONS, matchTypeLabel } from '../../lib/matchTypes'
 import { uncategorizedColor, useScheme } from '../../theme'
-import type { MerchantRule } from '../../types'
+import type { MatchType, MerchantRule } from '../../types'
 import { useFittingRows } from '../../hooks/useFittingRows'
 import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import {
@@ -47,6 +48,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
 
   const [merchant, setMerchant] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [matchType, setMatchType] = useState<MatchType>('EQUALS')
   const [notice, setNotice] = useState<string | null>(null)
 
   const categoryById = new Map(categories.map((category) => [category.id, category]))
@@ -82,9 +84,10 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
 
   const save = () => {
     if (!merchant.trim() || categoryId === '') return
-    create.mutate({ merchant: merchant.trim(), categoryId: Number(categoryId) })
+    create.mutate({ merchant: merchant.trim(), categoryId: Number(categoryId), matchType })
     setMerchant('')
     setCategoryId('')
+    setMatchType('EQUALS')
   }
 
   const runApply = async (id: number, label: string) => {
@@ -167,6 +170,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap>
                     {category?.name ?? `Category ${rule.categoryId}`}
+                    {` · ${matchTypeLabel(rule.matchType)}`}
                   </Typography>
                 </Box>
                 <IconButton size="small" title="Apply to matching history" onClick={() => runApply(rule.id, rule.merchant)} aria-label={`Apply default for ${rule.merchant}`}>
@@ -216,6 +220,19 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           {assignable.map((category) => (
             <MenuItem key={category.id} value={String(category.id)}>
               {category.name}
+            </MenuItem>
+          ))}
+        </Select>
+        <Select
+          size="small"
+          value={matchType}
+          onChange={(event) => setMatchType(event.target.value as MatchType)}
+          sx={{ minWidth: 130 }}
+          inputProps={{ 'aria-label': 'How the counterparty is matched' }}
+        >
+          {MATCH_TYPE_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
             </MenuItem>
           ))}
         </Select>
