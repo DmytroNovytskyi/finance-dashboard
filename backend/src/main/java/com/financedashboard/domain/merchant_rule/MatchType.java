@@ -15,7 +15,10 @@ public enum MatchType {
     /** The counterparty is exactly the rule's text. The behaviour every rule had before it existed. */
     EQUALS(0),
 
-    /** The counterparty begins with the rule's text; {@code EXAMPLE SHOP} claims {@code EXAMPLE SHOP SP. Z O.O.}. */
+    /**
+     * The counterparty begins with the rule's text; {@code EXAMPLE SHOP} claims
+     * {@code EXAMPLE SHOP SP. Z O.O.}.
+     */
     STARTS_WITH(1),
 
     /** The counterparty contains the rule's text anywhere; {@code EXAMPLE SHOP} claims a card-payment line too. */

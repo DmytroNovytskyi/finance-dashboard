@@ -240,7 +240,7 @@ class MerchantRuleServiceTest {
         when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
         when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RuleDetail created = service.create("Example Shop", CATEGORY, MatchType.CONTAINS);
+        RuleDetail created = service.create("EXAMPLE SHOP", CATEGORY, MatchType.CONTAINS);
 
         assertThat(created.matchType()).isEqualTo(MatchType.CONTAINS);
         ArgumentCaptor<MerchantRule> captor = ArgumentCaptor.forClass(MerchantRule.class);
@@ -253,7 +253,7 @@ class MerchantRuleServiceTest {
         when(categories.findById(CATEGORY)).thenReturn(Optional.of(category(CATEGORY, "Taxes")));
         when(rules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(service.create("Example Shop", CATEGORY, null).matchType()).isEqualTo(MatchType.EQUALS);
+        assertThat(service.create("EXAMPLE SHOP", CATEGORY, null).matchType()).isEqualTo(MatchType.EQUALS);
     }
 
     @Test
@@ -263,7 +263,7 @@ class MerchantRuleServiceTest {
         when(rules.findAll()).thenReturn(List.of(rule));
         when(transactions.findUncategorized()).thenReturn(List.of(
                 transaction(1L, "EXAMPLE SHOP SP. Z O.O."),
-                transaction(2L, "TRANSAKCJA KARTĄ PŁATNICZĄ Example Shop Poznan"),
+                transaction(2L, "CARD PAYMENT EXAMPLE SHOP POZNAN"),
                 transaction(3L, "EXAMPLE MARKET")));
         when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -292,7 +292,7 @@ class MerchantRuleServiceTest {
         MerchantRule rule = MerchantRule.builder().id(5L).merchant("EXAMPLE SHOP")
                 .matchType(MatchType.CONTAINS).categoryId(CATEGORY).build();
         when(rules.findById(5L)).thenReturn(Optional.of(rule));
-        Transaction wrapped = transaction(1L, "TRANSAKCJA KARTĄ EXAMPLE SHOP").toBuilder().categoryId(CATEGORY).build();
+        Transaction wrapped = transaction(1L, "CARD PAYMENT EXAMPLE SHOP").toBuilder().categoryId(CATEGORY).build();
         Transaction otherMerchant = transaction(2L, "EXAMPLE STORE").toBuilder().categoryId(CATEGORY).build();
         when(transactions.findCategorized()).thenReturn(List.of(wrapped, otherMerchant));
         when(transactions.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));

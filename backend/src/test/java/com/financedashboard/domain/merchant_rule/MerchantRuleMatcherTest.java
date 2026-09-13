@@ -33,7 +33,7 @@ class MerchantRuleMatcherTest {
         List<MerchantRule> rules = List.of(rule(1, "EXAMPLE SHOP", MatchType.STARTS_WITH, ENTERTAINMENT));
 
         assertThat(MerchantRuleMatcher.categoryFor("EXAMPLE SHOP SP. Z O.O.", rules)).isEqualTo(ENTERTAINMENT);
-        assertThat(MerchantRuleMatcher.categoryFor("TRANSAKCJA KARTĄ EXAMPLE SHOP", rules)).isNull();
+        assertThat(MerchantRuleMatcher.categoryFor("CARD PAYMENT EXAMPLE SHOP", rules)).isNull();
     }
 
     @Test
@@ -41,7 +41,7 @@ class MerchantRuleMatcherTest {
         List<MerchantRule> rules = List.of(rule(1, "EXAMPLE SHOP", MatchType.CONTAINS, ENTERTAINMENT));
 
         assertThat(MerchantRuleMatcher.categoryFor("EXAMPLE SHOP SP. Z O.O.", rules)).isEqualTo(ENTERTAINMENT);
-        assertThat(MerchantRuleMatcher.categoryFor("TRANSAKCJA KARTĄ EXAMPLE SHOP", rules)).isEqualTo(ENTERTAINMENT);
+        assertThat(MerchantRuleMatcher.categoryFor("CARD PAYMENT EXAMPLE SHOP", rules)).isEqualTo(ENTERTAINMENT);
         assertThat(MerchantRuleMatcher.categoryFor("EXAMPLE MARKET", rules)).isNull();
     }
 
@@ -84,7 +84,7 @@ class MerchantRuleMatcherTest {
                 rule(1, "EXAMPLE SHOP", MatchType.CONTAINS, ENTERTAINMENT),
                 rule(2, "EXAMPLE SHOP SP. Z O.O.", MatchType.EQUALS, CLOTHING));
 
-        assertThat(MerchantRuleMatcher.categoryFor("TRANSAKCJA KARTĄ EXAMPLE SHOP", rules))
+        assertThat(MerchantRuleMatcher.categoryFor("CARD PAYMENT EXAMPLE SHOP", rules))
                 .isEqualTo(ENTERTAINMENT);
     }
 

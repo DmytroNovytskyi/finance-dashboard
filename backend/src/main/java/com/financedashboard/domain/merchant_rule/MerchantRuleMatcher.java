@@ -7,8 +7,8 @@ import java.util.List;
  * Resolves a counterparty against a set of rules.
  *
  * <p>Once matching stopped being exact, more than one rule could claim the same counterparty:
- * {@code EXAMPLE SHOP} as a containment and {@code EXAMPLE SHOP SP. Z O.O.} as an equality both claim that
- * shop. The winner is settled by {@link #BY_SPECIFICITY}, so the outcome does not depend on the
+ * {@code EXAMPLE SHOP} as a containment and {@code EXAMPLE SHOP SP. Z O.O.} as an equality both claim
+ * that shop. The winner is settled by {@link #BY_SPECIFICITY}, so the outcome does not depend on the
  * order the rules happen to be stored in, and a narrow rule can be added to refine a broad one
  * without deleting it.
  *
