@@ -47,14 +47,27 @@ class TransactionApiTest extends AbstractIntegrationTest {
 
     private Long insertTransaction(LocalDate date, String amount, String nature,
                                    String description, String merchant, Long categoryId) {
-        return jdbcTemplate.queryForObject("""
+        return insertTransaction(date, amount, "PLN", nature, description, merchant, categoryId);
+    }
+
+    private Long insertTransaction(LocalDate date, String amount, String currency, String nature,
+                                   String description, String merchant, Long categoryId) {
+        Long id = jdbcTemplate.queryForObject("""
                 insert into transaction
                     (statement_id, account_id, transaction_date, amount, currency, nature,
                      description, merchant, category_id)
-                values (1, 1, ?, ?, 'PLN', ?, ?, ?, ?)
+                values (1, 1, ?, ?, ?, ?, ?, ?, ?)
                 returning id
                 """, Long.class,
-                Date.valueOf(date), new BigDecimal(amount), nature, description, merchant, categoryId);
+                Date.valueOf(date), new BigDecimal(amount), currency, nature, description, merchant, categoryId);
+        insertStoredAmount(id, currency, amount);
+        return id;
+    }
+
+    private void insertStoredAmount(Long transactionId, String currency, String amount) {
+        jdbcTemplate.update("""
+                insert into transaction_amount (transaction_id, currency, amount) values (?, ?, ?)
+                """, transactionId, currency, new BigDecimal(amount));
     }
 
     @Test
@@ -191,6 +204,67 @@ class TransactionApiTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].description").value("Hotel night"))
                 .andExpect(jsonPath("$.content[1].description").value("Groceries run"))
                 .andExpect(jsonPath("$.content[3].description").value("Monthly salary"));
+    }
+
+    @Test
+    void sortsByAmountByTheWorthInTheBaseCurrency() throws Exception {
+        Long usd = insertTransaction(LocalDate.of(2026, 9, 3), "-1000.00", "USD", "EXPENSE",
+                "Conference fee", "Example Payee", null);
+        insertStoredAmount(usd, "PLN", "-4000.00");
+
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "amount").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.content[0].id").value(usd))
+                .andExpect(jsonPath("$.content[0].amount").value(closeTo(-1000.0, 0.001)))
+                .andExpect(jsonPath("$.content[0].currency").value("USD"))
+                .andExpect(jsonPath("$.content[1].description").value("Hotel night"))
+                .andExpect(jsonPath("$.content[4].description").value("Monthly salary"));
+
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "amount").param("order", "desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].description").value("Monthly salary"))
+                .andExpect(jsonPath("$.content[4].id").value(usd));
+    }
+
+    @Test
+    void keepsRowsWithoutABaseCurrencyValueAndRanksThemLast() throws Exception {
+        Long unvalued = jdbcTemplate.queryForObject("""
+                insert into transaction
+                    (statement_id, account_id, transaction_date, amount, currency, nature, description)
+                values (1, 1, '2026-09-03', '-5000.00', 'USD', 'EXPENSE', 'Unpriced subscription')
+                returning id
+                """, Long.class);
+
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "amount").param("order", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.content[0].description").value("Hotel night"))
+                .andExpect(jsonPath("$.content[4].id").value(unvalued));
+
+        mockMvc.perform(get("/api/v1/transactions").param("sort", "amount").param("order", "desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].description").value("Monthly salary"))
+                .andExpect(jsonPath("$.content[4].id").value(unvalued));
+    }
+
+    @Test
+    void pagesAmountSortedResultsByTheirBaseCurrencyWorth() throws Exception {
+        Long usd = insertTransaction(LocalDate.of(2026, 9, 3), "-1000.00", "USD", "EXPENSE",
+                "Conference fee", "Example Payee", null);
+        insertStoredAmount(usd, "PLN", "-4000.00");
+
+        mockMvc.perform(get("/api/v1/transactions")
+                        .param("sort", "amount")
+                        .param("order", "asc")
+                        .param("nature", "EXPENSE")
+                        .param("page", "1")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.content[0].description").value("Groceries run"))
+                .andExpect(jsonPath("$.content[1].description").value("Pizza dinner"));
     }
 
     @Test

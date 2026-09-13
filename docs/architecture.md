@@ -112,9 +112,13 @@ category).
 Transactions: `GET /api/v1/transactions` lists filtered rows (`accountId`, `categoryId`/`uncategorized`,
 `nature`, `from`/`to`, `q`, `ids` repeated, `merchant`, `withoutMerchant`, `page`/`size`) ordered by `sort`
 (`date|amount|account|category`) with `order` (`asc|desc`; default date descending). Account and
-category order by their names. `ids` restricts the list to an explicit set of rows — an empty or
-absent list means no constraint — which is how clicking a suggested pair shows the transactions it
-refers to.
+category order by their names. `amount` orders by the row's **worth in the base currency**, not by
+the native amount it reports, so a list holding more than one currency reads on a single scale —
+which is why the `amount` column is free not to run monotonically. A row with no stored value for
+the base currency keeps its place in the list (the statistics skip such rows; the list must show
+them) and orders last in both directions. `ids` restricts the list to an explicit set of rows — an
+empty or absent list means no constraint — which is how clicking a suggested pair shows the
+transactions it refers to.
 
 Statistics: `GET /api/v1/statistics/summary?from&to[&accountId|kind][&topN][&granularity][&displayCurrency]`
 reports period totals (income, expense magnitude, net = income − expense, transaction count,

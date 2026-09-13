@@ -7,6 +7,7 @@ import com.financedashboard.domain.transaction.TransactionFilter;
 import com.financedashboard.domain.transaction.TransactionNature;
 import com.financedashboard.domain.transaction.TransactionOrder;
 import com.financedashboard.domain.transaction.TransactionSortField;
+import com.financedashboard.infrastructure.persistence.entity.TransactionAmountEntity;
 import com.financedashboard.infrastructure.persistence.entity.TransactionEntity;
 import com.financedashboard.infrastructure.persistence.mapper.TransactionMapper;
 import jakarta.persistence.EntityManager;
@@ -16,6 +17,8 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -47,6 +51,9 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    @Value("${finance.base-currency:PLN}")
+    private String baseCurrency;
 
     @Override
     public Transaction save(Transaction transaction) {
@@ -210,6 +217,9 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
 
     @Override
     public PagedTransactions search(TransactionFilter filter, int page, int size, TransactionOrder order) {
+        if (order.field() == TransactionSortField.AMOUNT) {
+            return searchByBaseCurrencyWorth(filter, page, size, order);
+        }
         Page<TransactionEntity> result = jpa.findAll(toSpecification(filter),
                 PageRequest.of(page, size, toSpringSort(order)));
         return new PagedTransactions(
@@ -219,13 +229,71 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
                 size);
     }
 
+    /**
+     * Orders by what each row was worth in the base currency rather than by its native amount, so
+     * that rows in different currencies are compared on one scale. The worth lives in
+     * {@code transaction_amount}, which {@link TransactionEntity} holds no association to and which
+     * a {@link Sort} cannot narrow to a single currency, so the ordering is a correlated subquery and
+     * paging is driven by its own count query. A row with no stored base-currency value keeps its
+     * place in the list — the statistics skip such rows, the list must not — and is ranked last in
+     * both directions.
+     */
+    private PagedTransactions searchByBaseCurrencyWorth(TransactionFilter filter, int page, int size,
+                                                        TransactionOrder order) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<TransactionEntity> query = cb.createQuery(TransactionEntity.class);
+        Root<TransactionEntity> root = query.from(TransactionEntity.class);
+        query.where(toSpecification(filter).toPredicate(root, query, cb));
+
+        Expression<BigDecimal> worth = baseCurrencyWorth(cb, query, root);
+        Expression<Integer> unvalued = cb.<Integer>selectCase().when(cb.isNull(worth), 1).otherwise(0);
+        query.orderBy(
+                cb.asc(unvalued),
+                order.ascending() ? cb.asc(worth) : cb.desc(worth),
+                cb.desc(root.get("id")));
+
+        List<TransactionEntity> content = entityManager.createQuery(query)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
+        return new PagedTransactions(
+                mapper.toDomain(content),
+                countMatching(filter, cb),
+                page,
+                size);
+    }
+
+    /**
+     * The stored amount for the base currency, as a subquery correlated to the outer row; null when
+     * the row has no stored value for that currency.
+     */
+    private Expression<BigDecimal> baseCurrencyWorth(CriteriaBuilder cb, CriteriaQuery<?> query,
+                                                     Root<TransactionEntity> root) {
+        Subquery<BigDecimal> worth = query.subquery(BigDecimal.class);
+        Root<TransactionAmountEntity> stored = worth.from(TransactionAmountEntity.class);
+        worth.select(stored.<BigDecimal>get("amount"))
+                .where(cb.equal(stored.<Long>get("transactionId"), root.<Long>get("id")),
+                        cb.equal(stored.<String>get("currency"),
+                                baseCurrency.trim().toUpperCase(Locale.ROOT)));
+        return worth;
+    }
+
+    private long countMatching(TransactionFilter filter, CriteriaBuilder cb) {
+        CriteriaQuery<Long> count = cb.createQuery(Long.class);
+        Root<TransactionEntity> root = count.from(TransactionEntity.class);
+        count.select(cb.count(root));
+        count.where(toSpecification(filter).toPredicate(root, count, cb));
+        return entityManager.createQuery(count).getSingleResult();
+    }
+
     private static Sort toSpringSort(TransactionOrder order) {
         Sort.Direction direction = order.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
         String path = switch (order.field()) {
             case DATE -> "transactionDate";
-            case AMOUNT -> "amount";
             case ACCOUNT -> "account.name";
             case CATEGORY -> "category.name";
+            case AMOUNT -> throw new IllegalArgumentException(
+                    "Amount is ordered by base-currency worth, not by a column");
         };
         return Sort.by(direction, path).and(Sort.by(Sort.Direction.DESC, "id"));
     }
