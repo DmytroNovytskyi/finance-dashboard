@@ -3,13 +3,19 @@ import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
+import type { CategoryPresentation } from '../../api/queries'
+import { AssignCategorySelect } from '../../components/AssignCategorySelect'
 import type { Transaction } from '../../types'
 
 interface LinkActionsProps {
   selected: Transaction[]
+  categories: CategoryPresentation[]
   busy: boolean
+  /** True while a category assignment is in flight, so the control cannot be used twice over. */
+  assigning: boolean
   onLinkRefund: (ids: number[]) => void
   onLinkTransfer: (fromId: number, toId: number) => void
+  onAssignCategory: (ids: number[], categoryId: number | null) => void
   onClear: () => void
 }
 
@@ -66,6 +72,23 @@ function transferShape(selected: Transaction[]): TransferShape | string {
   if (from.currency !== to.currency) return 'the two legs must be in one currency'
   if (Math.abs(toMinor(from.amount)) !== toMinor(to.amount)) return 'the two legs must cancel out'
   return { from, to }
+}
+
+/**
+ * Why the selection cannot be given a category, or null when it can. A linked leg is fixed to its
+ * reserved category, and the backend refuses the whole batch if even one row is linked rather than
+ * skipping it silently — so the control is disabled and says why, instead of letting the request
+ * come back as a 400 with nothing applied. The list is the only place a linked row can be selected;
+ * the categorize queue holds neither paired rows nor categorized ones.
+ */
+function assignProblem(selected: Transaction[]): string | null {
+  const linked = selected.filter(
+    (transaction) => transaction.nature !== 'INCOME' && transaction.nature !== 'EXPENSE',
+  )
+  if (linked.length === 0) return null
+  return linked.length === 1
+    ? 'a linked transfer or refund cannot be re-categorized — unlink it first'
+    : `${linked.length} of these are linked transfers or refunds — unlink them first`
 }
 
 /**
@@ -151,22 +174,44 @@ function SelectionBar({ highlighted, children }: { highlighted: boolean; childre
  * is selected and says what selecting would do, so entering and leaving a selection never moves the
  * table underneath it.
  */
-export function LinkActions({ selected, busy, onLinkRefund, onLinkTransfer, onClear }: LinkActionsProps) {
+export function LinkActions({
+  selected,
+  categories,
+  busy,
+  assigning,
+  onLinkRefund,
+  onLinkTransfer,
+  onAssignCategory,
+  onClear,
+}: LinkActionsProps) {
   if (selected.length === 0) {
     return (
       <SelectionBar highlighted={false}>
         <Typography variant="body2" color="text.secondary">
-          Select rows to link a refund or an internal transfer.
+          Select rows to assign a category, or to link a refund or an internal transfer.
         </Typography>
       </SelectionBar>
     )
   }
 
+  const assignReason = assignProblem(selected)
+
   return (
     <SelectionBar highlighted>
-      <Typography variant="body2" sx={{ mr: 'auto' }}>
+      <Typography variant="body2" sx={{ mr: 'auto' }} noWrap>
         {selected.length} selected
       </Typography>
+
+      <Tooltip title={assignReason ?? 'Assign one category to every selected row'}>
+        <span>
+          <AssignCategorySelect
+            categories={categories}
+            includeUncategorized
+            disabled={assignReason !== null || assigning}
+            onAssign={(categoryId) => onAssignCategory(selected.map((transaction) => transaction.id), categoryId)}
+          />
+        </span>
+      </Tooltip>
 
       <LinkButtons
         selected={selected}

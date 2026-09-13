@@ -19,7 +19,7 @@ import { queryKeys } from '../../api/keys'
 import type { AccountPresentation } from '../../api/queries'
 import type { Transaction } from '../../types'
 import { PageHeader, PageShell } from '../../components/PageLayout'
-import { useCategorizeOne } from '../categorize/hooks'
+import { useCategorizeBulk, useCategorizeOne } from '../categorize/hooks'
 import { DeleteRangeDialog } from './DeleteRangeDialog'
 import { invalidatePairs } from './invalidatePairs'
 import { LinkActions } from './LinkActions'
@@ -148,6 +148,13 @@ export function TransactionsPage() {
 
   const categorizeOne = useCategorizeOne()
 
+  /**
+   * Assigning to a whole selection clears it once the call lands, the way the categorize queue
+   * clears its own: the rows have been dealt with, and leaving them selected invites a second
+   * assignment — or a link — over the top of the first.
+   */
+  const categorizeBulk = useCategorizeBulk()
+
   const invalidateAfterUnlink = () => invalidatePairs(queryClient)
 
   const unlinkMutation = useMutation({
@@ -254,9 +261,14 @@ export function TransactionsPage() {
       {editMode ? (
         <LinkActions
           selected={[...selected.values()]}
+          categories={categories}
           busy={linking.busy}
+          assigning={categorizeBulk.isPending}
           onLinkRefund={linking.linkRefund}
           onLinkTransfer={linking.linkTransfer}
+          onAssignCategory={(ids, categoryId) =>
+            categorizeBulk.mutate({ ids, categoryId }, { onSuccess: () => setSelected(new Map()) })
+          }
           onClear={() => setSelected(new Map())}
         />
       ) : null}

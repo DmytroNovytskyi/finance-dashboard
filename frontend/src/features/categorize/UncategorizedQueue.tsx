@@ -14,6 +14,7 @@ import TextField from '@mui/material/TextField'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import type { CategoryPresentation } from '../../api/queries'
+import { AssignCategorySelect } from '../../components/AssignCategorySelect'
 import { useFittingRows } from '../../hooks/useFittingRows'
 import { usePageOnWheel } from '../../hooks/usePageOnWheel'
 import { amountColor, useScheme } from '../../theme'
@@ -267,20 +268,12 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
                 sx={{ m: 0 }}
               />
             ) : null}
-            <Select
-              size="small"
-              displayEmpty
-              value=""
-              onChange={(event) => assignMany(Number(event.target.value))}
-              renderValue={() => 'Assign category…'}
-              sx={{ minWidth: 200 }}
-            >
-              {assignable.map((category) => (
-                <MenuItem key={category.id} value={String(category.id)}>
-                  {category.name}
-                </MenuItem>
-              ))}
-            </Select>
+            <AssignCategorySelect
+              categories={categories}
+              onAssign={(categoryId) => {
+                if (categoryId !== null) assignMany(categoryId)
+              }}
+            />
             <LinkButtons
               selected={selectedRows}
               busy={linking.busy}
