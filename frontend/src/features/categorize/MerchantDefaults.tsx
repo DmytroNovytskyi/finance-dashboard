@@ -5,6 +5,12 @@ import LinkOff from '@mui/icons-material/LinkOff'
 import PlayArrow from '@mui/icons-material/PlayArrow'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
@@ -50,6 +56,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const [categoryId, setCategoryId] = useState('')
   const [matchType, setMatchType] = useState<MatchType>('EQUALS')
   const [notice, setNotice] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<MerchantRule | null>(null)
 
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedCategory = categoryId !== '' ? categoryById.get(Number(categoryId)) : undefined
@@ -179,7 +186,7 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
                 <IconButton size="small" onClick={() => runUnlink(rule.id, rule.merchant)} title="Unlink: clear the rows it tagged but keep this default" aria-label={`Unlink default for ${rule.merchant}`}>
                   <LinkOff fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => remove.mutate(rule.id)} title="Delete: stops auto-tagging and un-categorizes matching rows" aria-label={`Delete default for ${rule.merchant}`}>
+                <IconButton size="small" onClick={() => setConfirmDelete(rule)} title="Delete: stops auto-tagging and un-categorizes matching rows" aria-label={`Delete default for ${rule.merchant}`}>
                   <Delete fontSize="small" />
                 </IconButton>
               </Box>
@@ -240,6 +247,33 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
           <Add />
         </IconButton>
       </Box>
+
+      <Dialog open={confirmDelete !== null} onClose={() => setConfirmDelete(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete default</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Delete the default for “{confirmDelete?.merchant}”? Every row it still claims that is filed under{' '}
+            {categoryById.get(confirmDelete?.categoryId ?? -1)?.name ?? 'its category'} becomes uncategorized, and it
+            stops tagging future imports. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (confirmDelete) {
+                const { id, merchant: name } = confirmDelete
+                remove.mutate(id, { onSuccess: () => setNotice(`Deleted the default for ${name}.`) })
+              }
+              setConfirmDelete(null)
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar open={notice !== null} autoHideDuration={4000} onClose={() => setNotice(null)} message={notice} />
     </Paper>

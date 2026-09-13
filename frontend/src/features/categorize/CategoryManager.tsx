@@ -33,9 +33,9 @@ const PAGINATION_HEIGHT = 48
 /** Unstretched height of one category row; the rows share whatever height the card has left. */
 const CATEGORY_ROW_HEIGHT = 40
 
-interface EditorState {
-  open: boolean
-  id?: number
+/** The category the edit dialog is renaming or recolouring. */
+interface EditState {
+  id: number
   name: string
   color: string
 }
@@ -47,7 +47,8 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const remove = useDeleteCategory()
   const unlink = useUncategorizeCategory()
 
-  const [editor, setEditor] = useState<EditorState>({ open: false, name: '', color: EMPTY_COLOR })
+  const [draft, setDraft] = useState({ name: '', color: EMPTY_COLOR })
+  const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null)
 
   const mutationError = (create.error ?? update.error ?? remove.error ?? unlink.error) as Error | null
@@ -71,34 +72,35 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
     enabled: maxPage > 0,
   })
 
-  const openCreate = () => setEditor({ open: true, name: '', color: EMPTY_COLOR })
-  const openEdit = (category: CategoryPresentation) => setEditor({ open: true, id: category.id, name: category.name, color: category.color })
+  /**
+   * Adds what the row at the foot of the card describes, then clears it for the next one. An
+   * untouched colour is left out rather than sent as the placeholder, so a category created without
+   * a preference still takes whatever colour the API assigns.
+   */
+  const createCategory = () => {
+    if (!draft.name.trim()) return
+    create.mutate({ name: draft.name.trim(), color: draft.color === EMPTY_COLOR ? undefined : draft.color })
+    setDraft({ name: '', color: EMPTY_COLOR })
+  }
 
-  const save = () => {
-    const { id, name, color } = editor
-    if (!name.trim()) return
-    if (id === undefined) {
-      create.mutate({ name: name.trim(), color: color === EMPTY_COLOR ? undefined : color })
-    } else {
-      update.mutate({ id, name: name.trim(), color })
-    }
-    setEditor({ open: false, name: '', color: EMPTY_COLOR })
+  const openEdit = (category: CategoryPresentation) =>
+    setEditing({ id: category.id, name: category.name, color: category.color })
+
+  const saveEdit = () => {
+    if (!editing || !editing.name.trim()) return
+    update.mutate({ id: editing.id, name: editing.name.trim(), color: editing.color })
+    setEditing(null)
   }
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%', minHeight: 300 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-        <Box>
-          <Typography variant="h6" component="h3">
-            Categories
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {categories.length} groups
-          </Typography>
-        </Box>
-        <Button size="small" startIcon={<Add />} onClick={openCreate}>
-          New
-        </Button>
+      <Box>
+        <Typography variant="h6" component="h3">
+          Categories
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {categories.length} groups
+        </Typography>
       </Box>
 
       {mutationError ? <Alert severity="error">{mutationError.message}</Alert> : null}
@@ -192,24 +194,59 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
         />
       ) : null}
 
-      <Dialog open={editor.open} onClose={() => setEditor({ ...editor, open: false })} maxWidth="xs" fullWidth>
-        <DialogTitle>{editor.id === undefined ? 'New category' : 'Edit category'}</DialogTitle>
+      <Box sx={{ display: 'flex', gap: 1, pt: 1 }}>
+        <TextField
+          size="small"
+          placeholder="New category"
+          value={draft.name}
+          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          sx={{ flexGrow: 1, minWidth: 120 }}
+        />
+        <Box
+          component="label"
+          title="Colour"
+          sx={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', bgcolor: draft.color, cursor: 'pointer', flexShrink: 0, display: 'inline-block' }}
+        >
+          <input
+            type="color"
+            value={draft.color}
+            onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+            aria-label="New category colour"
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+          />
+        </Box>
+        <IconButton
+          onClick={createCategory}
+          disabled={!draft.name.trim() || create.isPending}
+          aria-label="Add category"
+          color="primary"
+        >
+          <Add />
+        </IconButton>
+      </Box>
+
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Edit category</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               autoFocus
               label="Name"
-              value={editor.name}
-              onChange={(event) => setEditor({ ...editor, name: event.target.value })}
+              value={editing?.name ?? ''}
+              onChange={(event) =>
+                setEditing((current) => (current ? { ...current, name: event.target.value } : current))
+              }
               fullWidth
               size="small"
             />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box component="label" sx={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', bgcolor: editor.color, cursor: 'pointer', flexShrink: 0, display: 'inline-block' }}>
+              <Box component="label" sx={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', bgcolor: editing?.color ?? EMPTY_COLOR, cursor: 'pointer', flexShrink: 0, display: 'inline-block' }}>
                 <input
                   type="color"
-                  value={editor.color}
-                  onChange={(event) => setEditor({ ...editor, color: event.target.value })}
+                  value={editing?.color ?? EMPTY_COLOR}
+                  onChange={(event) =>
+                    setEditing((current) => (current ? { ...current, color: event.target.value } : current))
+                  }
                   style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
                   aria-label="Color"
                 />
@@ -221,8 +258,8 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditor({ ...editor, open: false })}>Cancel</Button>
-          <Button variant="contained" onClick={save} disabled={!editor.name.trim()}>
+          <Button onClick={() => setEditing(null)}>Cancel</Button>
+          <Button variant="contained" onClick={saveEdit} disabled={!editing?.name.trim()}>
             Save
           </Button>
         </DialogActions>

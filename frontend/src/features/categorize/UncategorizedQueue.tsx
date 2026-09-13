@@ -64,7 +64,7 @@ function RowAmount({ transaction }: { transaction: Transaction }) {
 
 /** Uncategorized rows, filtered by nature, selectable for bulk assignment to a category. */
 export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
-  const [nature, setNature] = useState<QueueNature>('EXPENSE')
+  const [nature, setNature] = useState<QueueNature>('ALL')
   const [selected, setSelected] = useState<ReadonlyMap<number, Transaction>>(new Map())
   const [remember, setRemember] = useState(false)
   const [matchType, setMatchType] = useState<MatchType>('EQUALS')
@@ -209,9 +209,9 @@ export function UncategorizedQueue({ categories }: UncategorizedQueueProps) {
             }
           }}
         >
+          <ToggleButton value="ALL">All</ToggleButton>
           <ToggleButton value="EXPENSE">Expenses</ToggleButton>
           <ToggleButton value="INCOME">Income</ToggleButton>
-          <ToggleButton value="ALL">All</ToggleButton>
         </ToggleButtonGroup>
       </Box>
 

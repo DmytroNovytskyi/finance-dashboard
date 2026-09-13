@@ -29,6 +29,10 @@ interface PeriodSelectorProps {
  * Choosing a preset moves the date control to whichever mode reads that span most naturally —
  * "Last month" is one whole month, "This year" is not — and editing the control directly drops the
  * preset, since the period is then no longer one of the named spans.
+ *
+ * While a named span is chosen its dates are shown greyed rather than cleared: the fields still say
+ * which period the dropdown resolved to, but the dropdown is the control being driven, so editing
+ * them would be a second, disagreeing way to set the same thing. "Custom range" hands them back.
  */
 export function PeriodSelector({
   period,
@@ -69,6 +73,8 @@ export function PeriodSelector({
       <DateRangeControl
         mode={period.mode}
         range={period.range}
+        disabled={period.preset !== 'custom'}
+        spanWhenUnbounded={period.preset === 'allTime'}
         onChange={(mode, range) => onChange({ preset: 'custom', range, mode })}
       />
 

@@ -26,20 +26,34 @@ import type { StatementCoverage } from '../types'
 const FIELD_WIDTH = 150
 
 /**
+ * The span the imported statements cover, earliest start to latest end across every account, or
+ * null when nothing is imported. An unbounded period reaches exactly this, which is why the control
+ * can name its dates where the period itself names none.
+ */
+function spanOfCoverage(coverage: StatementCoverage[]): DateRange | null {
+  const starts = coverage.map((row) => row.earliestPeriodStart).filter((date): date is string => date !== null)
+  const ends = coverage.map((row) => row.latestPeriodEnd).filter((date): date is string => date !== null)
+  if (starts.length === 0 || ends.length === 0) {
+    return null
+  }
+  return {
+    from: starts.reduce((a, b) => (a < b ? a : b)),
+    to: ends.reduce((a, b) => (a > b ? a : b)),
+  }
+}
+
+/**
  * The years the imported statements actually reach, newest first. A fixed window would list years
  * holding nothing and let the picker send you to an empty month page, so the list comes from what
  * the accounts cover instead.
  */
 function yearsOfCoverage(coverage: StatementCoverage[]): number[] {
-  const starts = coverage.map((row) => row.earliestPeriodStart).filter((date): date is string => date !== null)
-  const ends = coverage.map((row) => row.latestPeriodEnd).filter((date): date is string => date !== null)
-  if (starts.length === 0 || ends.length === 0) {
+  const span = spanOfCoverage(coverage)
+  if (span?.from == null || span.to == null) {
     return []
   }
-  const first = Number(starts.reduce((a, b) => (a < b ? a : b)).slice(0, 4))
-  const last = Number(ends.reduce((a, b) => (a > b ? a : b)).slice(0, 4))
   const years: number[] = []
-  for (let year = last; year >= first; year--) {
+  for (let year = Number(span.to.slice(0, 4)); year >= Number(span.from.slice(0, 4)); year--) {
     years.push(year)
   }
   return years
@@ -79,6 +93,19 @@ interface DateRangeControlProps {
   onChange: (mode: DateMode, range: DateRange) => void
   /** Which modes the toggle offers, in order. Defaults to every mode but all-time. */
   modes?: DateMode[]
+  /**
+   * Renders the fields read-only, for a caller whose period is chosen on another control. The range
+   * still shows what that control set — it is greyed, not emptied — so the dates stay legible while
+   * the period dropdown is the thing being driven.
+   */
+  disabled?: boolean
+  /**
+   * Shows the span the imported statements cover in place of a range that names no dates, so an
+   * unbounded period can still say what it reaches instead of showing two blank fields. Display
+   * only — it never becomes the range the caller holds. Leave it off on an editable control, whose
+   * empty fields must stay empty rather than name a period it is not set to.
+   */
+  spanWhenUnbounded?: boolean
 }
 
 /**
@@ -90,7 +117,14 @@ interface DateRangeControlProps {
  * in. Switching modes rewrites the period in the terms of the new mode, so the views never
  * disagree about what is selected.
  */
-export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES }: DateRangeControlProps) {
+export function DateRangeControl({
+  mode,
+  range,
+  onChange,
+  modes = DEFAULT_MODES,
+  disabled = false,
+  spanWhenUnbounded = false,
+}: DateRangeControlProps) {
   const now = new Date()
   const offered = MODE_LABELS.filter((option) => modes.includes(option.value))
   const active = offered.some((option) => option.value === mode) ? mode : offered[0].value
@@ -102,6 +136,9 @@ export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES 
   const years = yearsOfCoverage(coverage.data ?? [])
   if (!years.includes(selectedYear)) years.push(selectedYear)
   years.sort((a, b) => b - a)
+
+  const named = range.from !== null || range.to !== null
+  const shown = spanWhenUnbounded && !named ? (spanOfCoverage(coverage.data ?? []) ?? range) : range
 
   const pickYear = (year: number) =>
     onChange('month', selectedMonth === ALL_MONTHS ? yearRange(year) : monthRange(year, Number(selectedMonth) - 1))
@@ -155,7 +192,7 @@ export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES 
             size="small"
             label="Year"
             value={String(selectedYear)}
-            disabled={active !== 'month'}
+            disabled={disabled || active !== 'month'}
             onChange={(event) => pickYear(Number(event.target.value))}
             sx={{ width: FIELD_WIDTH }}
           >
@@ -170,7 +207,7 @@ export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES 
             size="small"
             label="Month"
             value={selectedMonth}
-            disabled={active !== 'month'}
+            disabled={disabled || active !== 'month'}
             onChange={(event) => pickMonth(event.target.value)}
             sx={{ width: FIELD_WIDTH }}
           >
@@ -188,7 +225,8 @@ export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES 
             type="date"
             size="small"
             label="From"
-            value={range.from ?? ''}
+            value={shown.from ?? ''}
+            disabled={disabled}
             onChange={(event) => onChange('dates', { ...range, from: event.target.value || null })}
             slotProps={{ inputLabel: { shrink: true } }}
             sx={{ width: FIELD_WIDTH }}
@@ -197,7 +235,8 @@ export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES 
             type="date"
             size="small"
             label="To"
-            value={range.to ?? ''}
+            value={shown.to ?? ''}
+            disabled={disabled}
             onChange={(event) => onChange('dates', { ...range, to: event.target.value || null })}
             slotProps={{ inputLabel: { shrink: true } }}
             sx={{ width: FIELD_WIDTH }}

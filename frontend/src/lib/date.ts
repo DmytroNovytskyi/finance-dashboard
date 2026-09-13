@@ -40,13 +40,18 @@ export type DateRangePreset =
   | 'allTime'
   | 'custom'
 
+/**
+ * The named spans the period dropdown offers, led by all-time: the statistics pages have no
+ * all-time mode of their own, so the dropdown is the only place that unbounded period can be
+ * chosen, and it reads first among the spans rather than last.
+ */
 export const DATE_RANGE_PRESETS: { value: Exclude<DateRangePreset, 'custom'>; label: string }[] = [
+  { value: 'allTime', label: 'All time' },
   { value: 'thisMonth', label: 'This month' },
   { value: 'lastMonth', label: 'Last month' },
   { value: 'thisQuarter', label: 'This quarter' },
   { value: 'lastQuarter', label: 'Last quarter' },
   { value: 'thisYear', label: 'This year' },
-  { value: 'allTime', label: 'All time' },
 ]
 
 function pad(n: number): string {
@@ -134,7 +139,7 @@ export function rangeForPreset(preset: Exclude<DateRangePreset, 'custom'>, now =
     case 'thisMonth':
       return { from: ymd(year, month + 1, 1), to: ymd(year, month + 1, now.getDate()) }
     case 'lastMonth':
-      return { from: ymd(year, month, 1), to: ymd(year, month, lastDayOf(year, month)) }
+      return { from: ymd(year, month, 1), to: ymd(year, month, lastDayOf(year, month - 1)) }
     case 'thisQuarter':
       return { from: ymd(year, quarterStart(month) + 1, 1), to: ymd(year, month + 1, now.getDate()) }
     case 'lastQuarter': {
@@ -149,6 +154,7 @@ export function rangeForPreset(preset: Exclude<DateRangePreset, 'custom'>, now =
   }
 }
 
+/** The number of days in the given month; month is 0-based, as everywhere else it is an index. */
 function lastDayOf(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate()
 }
