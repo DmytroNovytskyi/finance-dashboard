@@ -203,6 +203,27 @@ class StatisticsApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void includesMerchantsThatOnlyEverReceivedMoney() throws Exception {
+        long account = insertAccount("PLN", null);
+        long statement = insertStatement(account, "h4");
+        insertTx(statement, account, "2026-03-10", "-900", "EXPENSE", null, "Shop");
+        insertTx(statement, account, "2026-03-11", "-800", "EXPENSE", null, "Market");
+        insertTx(statement, account, "2026-03-12", "5000", "INCOME", null, "Employer");
+
+        mockMvc.perform(get("/api/v1/statistics/summary")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31")
+                        .param("topN", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topMerchants.length()").value(3))
+                .andExpect(jsonPath("$.topMerchants[0].merchant").value("Shop"))
+                .andExpect(jsonPath("$.topMerchants[1].merchant").value("Market"))
+                .andExpect(jsonPath("$.topMerchants[2].merchant").value("Employer"))
+                .andExpect(jsonPath("$.topMerchants[2].income").value(5000.0))
+                .andExpect(jsonPath("$.topMerchants[2].expense").value(0.0));
+    }
+
+    @Test
     void rejectsInvalidRequests() throws Exception {
         long account = insertAccount("PLN", null);
 

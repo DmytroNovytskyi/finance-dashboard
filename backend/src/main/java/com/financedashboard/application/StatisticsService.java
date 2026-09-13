@@ -42,6 +42,22 @@ public class StatisticsService {
     private static final String NO_MERCHANT_LABEL = "(no merchant)";
     private static final String UNCATEGORIZED_LABEL = "(uncategorized)";
 
+    /**
+     * The spend ranking, which orders the merchant list. It cannot reach a merchant that only ever
+     * received money: every merchant that never spent ties at the same zero, so a list cut to the
+     * first N of this order holds none of them however large their income is.
+     */
+    private static final Comparator<MerchantTotal> BY_SPEND =
+            Comparator.comparing(MerchantTotal::expense).reversed()
+                    .thenComparing(Comparator.comparingLong(MerchantTotal::count).reversed())
+                    .thenComparing(MerchantTotal::merchant);
+
+    /** The income ranking, which is what makes a merchant that never spent reachable at all. */
+    private static final Comparator<MerchantTotal> BY_INCOME =
+            Comparator.comparing(MerchantTotal::income).reversed()
+                    .thenComparing(Comparator.comparingLong(MerchantTotal::count).reversed())
+                    .thenComparing(MerchantTotal::merchant);
+
     private final TransactionRepository transactions;
     private final AccountRepository accounts;
     private final CategoryRepository categories;
@@ -130,7 +146,10 @@ public class StatisticsService {
     /**
      * Computes the summary for the inclusive date range. The range is restricted to one account
      * when {@code accountId} is set, otherwise to accounts of the given {@code kind} when set,
-     * otherwise to all accounts. {@code topN} bounds the merchant list (1..50, default 10).
+     * otherwise to all accounts. {@code topN} bounds the merchant list per direction (1..50,
+     * default 10): the list holds the {@code topN} merchants by spend <em>and</em> the
+     * {@code topN} by income, so a caller can rank either way from one response. Leading with
+     * spend alone would hide every merchant that never spent, whatever their income.
      * {@code granularity} selects the time buckets of the returned {@code trend}.
      */
     public Summary summary(LocalDate from, LocalDate to, Long accountId, AccountKind kind, Integer topN,
@@ -228,14 +247,17 @@ public class StatisticsService {
         categoryTotals.sort(Comparator.comparing(CategoryTotal::expense).reversed()
                 .thenComparing(CategoryTotal::categoryName));
 
-        List<MerchantTotal> topMerchants = byMerchant.entrySet().stream()
+        List<MerchantTotal> rankedMerchants = byMerchant.entrySet().stream()
                 .map(e -> new MerchantTotal(e.getKey(), e.getValue().count, e.getValue().income,
                         e.getValue().expense, e.getValue().net()))
-                .sorted(Comparator.comparing(MerchantTotal::expense).reversed()
-                        .thenComparing(Comparator.comparingLong(MerchantTotal::count).reversed())
-                        .thenComparing(MerchantTotal::merchant))
-                .limit(clampTopN(topN))
                 .toList();
+        Map<String, MerchantTotal> leadingMerchants = new LinkedHashMap<>();
+        rankedMerchants.stream().sorted(BY_SPEND).limit(clampTopN(topN))
+                .forEach(merchant -> leadingMerchants.put(merchant.merchant(), merchant));
+        rankedMerchants.stream().filter(merchant -> merchant.income().signum() > 0)
+                .sorted(BY_INCOME).limit(clampTopN(topN))
+                .forEach(merchant -> leadingMerchants.putIfAbsent(merchant.merchant(), merchant));
+        List<MerchantTotal> topMerchants = List.copyOf(leadingMerchants.values());
 
         return new Summary(from, to, code, total, monthly, categoryTotals, topMerchants, trend);
     }

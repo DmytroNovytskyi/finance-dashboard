@@ -119,7 +119,11 @@ refers to.
 Statistics: `GET /api/v1/statistics/summary?from&to[&accountId|kind][&topN][&granularity][&displayCurrency]`
 reports period totals (income, expense magnitude, net = income − expense, transaction count,
 uncategorized count, average daily expense) plus the same split by month, by category
-(uncategorized bucketed as `(uncategorized)`), top merchants, and a `trend` of time buckets. The
+(uncategorized bucketed as `(uncategorized)`), top merchants, and a `trend` of time buckets.
+`topN` bounds the merchant list **per direction**: it carries the `topN` merchants by spend and the
+`topN` by income together, because a list ranked by spend alone can never hold a merchant that only
+ever received money — every one of them ties at zero spend, so any cut by rank drops them all. The
+list leads with the spend ranking and appends the income-only merchants after it. The
 optional `granularity` (`day|week|month|quarter|year`, default `month`) selects the bucket width of
 the `trend`; each trend point carries its inclusive `start`/`end` dates. Amounts are summed in the
 currency selected by `displayCurrency` (default the base), reading the per-currency values stored
