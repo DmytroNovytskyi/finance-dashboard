@@ -195,6 +195,14 @@ export function LinkActions({
   }
 
   const assignReason = assignProblem(selected)
+  const assignSelect = (
+    <AssignCategorySelect
+      categories={categories}
+      includeUncategorized
+      disabled={assignReason !== null || assigning}
+      onAssign={(categoryId) => onAssignCategory(selected.map((transaction) => transaction.id), categoryId)}
+    />
+  )
 
   return (
     <SelectionBar highlighted>
@@ -202,16 +210,13 @@ export function LinkActions({
         {selected.length} selected
       </Typography>
 
-      <Tooltip title={assignReason ?? 'Assign one category to every selected row'}>
-        <span>
-          <AssignCategorySelect
-            categories={categories}
-            includeUncategorized
-            disabled={assignReason !== null || assigning}
-            onAssign={(categoryId) => onAssignCategory(selected.map((transaction) => transaction.id), categoryId)}
-          />
-        </span>
-      </Tooltip>
+      {assignReason === null ? (
+        assignSelect
+      ) : (
+        <Tooltip title={assignReason}>
+          <span>{assignSelect}</span>
+        </Tooltip>
+      )}
 
       <LinkButtons
         selected={selected}
