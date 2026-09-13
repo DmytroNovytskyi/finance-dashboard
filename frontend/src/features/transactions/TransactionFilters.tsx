@@ -23,6 +23,24 @@ interface TransactionFiltersProps {
   onEditModeChange: (editMode: boolean) => void
 }
 
+/**
+ * How much of a counterparty name the chip spells out. Statement counterparties run to 40 characters
+ * and no further, so this bounds the chip without shortening anything a statement can name; a longer
+ * value — one typed into the URL by hand — is marked as cut rather than swelling the bar.
+ */
+const MERCHANT_LABEL_LIMIT = 40
+
+/** The chip's text for the active counterparty filter. */
+function merchantLabel(merchant: string | undefined, withoutMerchant: boolean | undefined): string {
+  if (withoutMerchant) {
+    return 'No merchant'
+  }
+  const name = merchant ?? ''
+  return name.length <= MERCHANT_LABEL_LIMIT
+    ? `Merchant: ${name}`
+    : `Merchant: ${name.slice(0, MERCHANT_LABEL_LIMIT)}…`
+}
+
 /** Filter bar for the transactions list: search, account, category, nature, date range, edit mode. */
 export function TransactionFilters({
   filters,
@@ -67,6 +85,21 @@ export function TransactionFilters({
         onChange={(event) => setSearch(event.target.value)}
         sx={{ flexGrow: 1, minWidth: 220 }}
       />
+      {filters.merchant !== undefined || filters.withoutMerchant ? (
+        <Chip
+          variant="outlined"
+          label={merchantLabel(filters.merchant, filters.withoutMerchant)}
+          title={filters.withoutMerchant ? undefined : filters.merchant}
+          onDelete={() => patch({ merchant: undefined, withoutMerchant: undefined })}
+          sx={{
+            height: 40,
+            borderRadius: 2,
+            pl: 0.5,
+            '.MuiChip-label': { px: 1.5, fontSize: '0.9375rem' },
+            '.MuiChip-deleteIcon': { fontSize: 20, mr: 1 },
+          }}
+        />
+      ) : null}
       <TextField
         select
         size="small"
@@ -118,20 +151,6 @@ export function TransactionFilters({
           patch({ dateMode, from: range.from ?? undefined, to: range.to ?? undefined })
         }
       />
-      {filters.merchant !== undefined || filters.withoutMerchant ? (
-        <Chip
-          variant="outlined"
-          label={filters.withoutMerchant ? 'No merchant' : `Merchant: ${filters.merchant}`}
-          onDelete={() => patch({ merchant: undefined, withoutMerchant: undefined })}
-          sx={{
-            height: 40,
-            borderRadius: 2,
-            pl: 0.5,
-            '.MuiChip-label': { px: 1.5, fontSize: '0.9375rem' },
-            '.MuiChip-deleteIcon': { fontSize: 20, mr: 1 },
-          }}
-        />
-      ) : null}
       <Button size="small" onClick={onClear} disabled={!hasFilters(filters)}>
         Clear
       </Button>
