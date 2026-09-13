@@ -19,8 +19,9 @@ export interface TxFilters {
   from?: string
   to?: string
   /**
-   * Whether the dates above are being written as one calendar month or as a day range. It is a
-   * view of the same dates rather than a filter of its own, so it is left out of {@link hasFilters}.
+   * How the dates above are being written: unbounded, one calendar month or year, or a day range.
+   * It is a view of the same dates rather than a filter of its own, so it is left out of
+   * {@link hasFilters}.
    */
   dateMode: DateMode
   q: string
@@ -32,7 +33,8 @@ export interface TxFilters {
   withoutMerchant?: boolean
 }
 
-export const emptyFilters: TxFilters = { uncategorized: false, q: '', dateMode: 'month' }
+/** The list opens unbounded: all three modes are a click away, and none of them is applied yet. */
+export const emptyFilters: TxFilters = { uncategorized: false, q: '', dateMode: 'allTime' }
 
 /**
  * The natures a filter may carry, which are the ones the filter bar offers. Linked transfers and
@@ -58,7 +60,7 @@ export function filtersFromUrl(searchParams: URLSearchParams): TxFilters {
     nature: natureValue,
     from: from ?? undefined,
     to: to ?? undefined,
-    dateMode: modeForRange({ from, to }),
+    dateMode: from || to ? modeForRange({ from, to }) : 'allTime',
     q: '',
     ids: ids.length > 0 ? ids : undefined,
     merchant: merchant === null ? undefined : merchant,

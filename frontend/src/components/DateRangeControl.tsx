@@ -60,21 +60,40 @@ function monthViewOf(range: DateRange, fallbackYear: number): DateRange {
   return start ? monthRange(start.year, start.month) : yearRange(fallbackYear)
 }
 
+/** The label each mode carries on the toggle, in the order the toggle offers them. */
+const MODE_LABELS: { value: DateMode; label: string }[] = [
+  { value: 'allTime', label: 'All time' },
+  { value: 'month', label: 'Month' },
+  { value: 'dates', label: 'Dates' },
+]
+
+/**
+ * The modes a control offers when its caller does not say. All-time is left out, because a page
+ * that has a period preset already carries it there and two controls for one span would disagree.
+ */
+const DEFAULT_MODES: DateMode[] = ['month', 'dates']
+
 interface DateRangeControlProps {
   mode: DateMode
   range: DateRange
   onChange: (mode: DateMode, range: DateRange) => void
+  /** Which modes the toggle offers, in order. Defaults to every mode but all-time. */
+  modes?: DateMode[]
 }
 
 /**
- * Picks a period either by the calendar or as an explicit day range, chosen with the toggle on the
- * left. Month mode is a year and a month: choosing a month takes that month of the chosen year, and
- * choosing "All months" takes the whole of it. Dates mode is two date fields. Switching modes
- * rewrites the period in the terms of the new mode, so the two views never disagree about what is
- * selected.
+ * Picks a period by the calendar, as an explicit day range, or not at all, chosen with the toggle
+ * on the left. Month mode is a year and a month: choosing a month takes that month of the chosen
+ * year, and choosing "All months" takes the whole of it. Dates mode is two date fields. All-time
+ * is the absence of a period, so its month picker stays in place but inactive rather than
+ * disappearing — the same two fields either way, so changing mode never reflows the bar it sits
+ * in. Switching modes rewrites the period in the terms of the new mode, so the views never
+ * disagree about what is selected.
  */
-export function DateRangeControl({ mode, range, onChange }: DateRangeControlProps) {
+export function DateRangeControl({ mode, range, onChange, modes = DEFAULT_MODES }: DateRangeControlProps) {
   const now = new Date()
+  const offered = MODE_LABELS.filter((option) => modes.includes(option.value))
+  const active = offered.some((option) => option.value === mode) ? mode : offered[0].value
   const month = wholeMonthOf(range)
   const selectedYear = wholeYearOf(range) ?? monthIndex(range.from)?.year ?? now.getFullYear()
   const selectedMonth = month?.slice(5) ?? ALL_MONTHS
@@ -95,10 +114,16 @@ export function DateRangeControl({ mode, range, onChange }: DateRangeControlProp
 
   /**
    * Leaving Month mode keeps the range, which reads the same either way. Entering it writes the
-   * range as the two selects can show it — see {@link monthViewOf}.
+   * range as the two selects can show it — see {@link monthViewOf}. All-time has no range to keep,
+   * so it clears both edges; the other modes then start from an unbounded period, which Month
+   * writes as the whole of the current year.
    */
   const switchMode = (next: DateMode | null) => {
     if (!next || next === mode) return
+    if (next === 'allTime') {
+      onChange('allTime', { from: null, to: null })
+      return
+    }
     if (next === 'dates') {
       onChange('dates', range)
       return
@@ -111,26 +136,26 @@ export function DateRangeControl({ mode, range, onChange }: DateRangeControlProp
       <ToggleButtonGroup
         size="small"
         exclusive
-        value={mode}
+        value={active}
         onChange={(_event, next: DateMode | null) => switchMode(next)}
         aria-label="How to pick the period"
         sx={{ flexShrink: 0 }}
       >
-        <ToggleButton value="month" sx={{ px: 1.5, py: 0.5, textTransform: 'none' }}>
-          Month
-        </ToggleButton>
-        <ToggleButton value="dates" sx={{ px: 1.5, py: 0.5, textTransform: 'none' }}>
-          Dates
-        </ToggleButton>
+        {offered.map((option) => (
+          <ToggleButton key={option.value} value={option.value} sx={{ px: 1.5, py: 0.5, textTransform: 'none' }}>
+            {option.label}
+          </ToggleButton>
+        ))}
       </ToggleButtonGroup>
 
-      {mode === 'month' ? (
+      {active !== 'dates' ? (
         <>
           <TextField
             select
             size="small"
             label="Year"
             value={String(selectedYear)}
+            disabled={active !== 'month'}
             onChange={(event) => pickYear(Number(event.target.value))}
             sx={{ width: FIELD_WIDTH }}
           >
@@ -145,6 +170,7 @@ export function DateRangeControl({ mode, range, onChange }: DateRangeControlProp
             size="small"
             label="Month"
             value={selectedMonth}
+            disabled={active !== 'month'}
             onChange={(event) => pickMonth(event.target.value)}
             sx={{ width: FIELD_WIDTH }}
           >

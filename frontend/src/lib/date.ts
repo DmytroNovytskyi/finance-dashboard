@@ -5,11 +5,12 @@ export interface DateRange {
 }
 
 /**
- * The two ways a period can be written: as one whole calendar month, or as an explicit range of
- * days. Month mode is the quick path and Dates mode is the exact one; they describe the same
- * underlying {@link DateRange}, so switching between them never loses the period.
+ * The three ways a period can be written: unbounded, as one whole calendar month or year, or as an
+ * explicit range of days. All-time is the absence of a period rather than a wide one, Month is the
+ * quick path and Dates is the exact one; all three describe the same underlying {@link DateRange},
+ * so switching between them never loses the period.
  */
-export type DateMode = 'month' | 'dates'
+export type DateMode = 'allTime' | 'month' | 'dates'
 
 /** The month picker's "All months" option: with the chosen year it selects that whole year. */
 export const ALL_MONTHS = 'all'

@@ -112,6 +112,7 @@ export function TransactionFilters({
       </TextField>
       <DateRangeControl
         mode={filters.dateMode}
+        modes={['allTime', 'month', 'dates']}
         range={{ from: filters.from ?? null, to: filters.to ?? null }}
         onChange={(dateMode, range) =>
           patch({ dateMode, from: range.from ?? undefined, to: range.to ?? undefined })
@@ -125,11 +126,9 @@ export function TransactionFilters({
           onDelete={() => patch({ merchant: undefined, withoutMerchant: undefined })}
         />
       ) : null}
-      {hasFilters(filters) ? (
-        <Button size="small" onClick={onClear}>
-          Clear
-        </Button>
-      ) : null}
+      <Button size="small" onClick={onClear} disabled={!hasFilters(filters)}>
+        Clear
+      </Button>
       <ToggleButton
         size="small"
         value="edit"

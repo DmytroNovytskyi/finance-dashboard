@@ -179,20 +179,34 @@ function CategoryCell({
   onUnlink: (id: number) => void
   onUnlinkRefund: (id: number) => void
 }) {
-  const nameOf = (id: number) => categories.find((category) => category.id === id)?.name ?? null
+  const categoryOf = (id: number | null) =>
+    id === null ? undefined : categories.find((category) => category.id === id)
 
   if (!editable) {
+    const category = categoryOf(transaction.categoryId)
     const paired =
       transaction.nature === 'TRANSFER'
         ? 'Internal Transfer'
         : transaction.nature === 'REFUND'
           ? 'Refund'
           : null
-    const label = paired ?? nameOf(transaction.categoryId ?? -1)
+    const label = paired ?? category?.name ?? null
     return (
-      <Typography variant="body2" color={label ? 'text.secondary' : 'text.disabled'} noWrap>
-        {label ?? 'Uncategorized'}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+        <Box
+          aria-hidden
+          sx={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            flexShrink: 0,
+            bgcolor: category?.color ?? 'transparent',
+          }}
+        />
+        <Typography variant="body2" color={label ? 'text.secondary' : 'text.disabled'} noWrap>
+          {label ?? 'Uncategorized'}
+        </Typography>
+      </Box>
     )
   }
 
