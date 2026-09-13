@@ -151,7 +151,9 @@ rule and reverts its rows, reporting the count the way unlink does),
 compared: `EQUALS` (the default, and the only behaviour before match types existed), `STARTS_WITH`
 or `CONTAINS`. Both sides are compared normalized — trimmed, uppercased, whitespace collapsed — so
 case and spacing never matter whichever type is used. A rule created without a `matchType` is
-`EQUALS`, which is what keeps rules stored before the feature behaving exactly as they did.
+`EQUALS`, which is what keeps rules stored before the feature behaving exactly as they did. Each
+rule in the list also carries `claimedRows` — how many rows deleting it would revert right now — so
+a client can say what a deletion costs before asking to confirm it.
 
 Once matching stopped being exact, one counterparty could be claimed by several rules, so
 `MerchantRuleMatcher` resolves them: the narrower match type wins (`EQUALS` over `STARTS_WITH` over

@@ -59,7 +59,8 @@ class MerchantRuleApiTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/merchant-rules"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].categoryId").value(categoryId));
+                .andExpect(jsonPath("$[0].categoryId").value(categoryId))
+                .andExpect(jsonPath("$[0].claimedRows").value(0));
 
         JsonNode list = objectMapper.readTree(
                 mockMvc.perform(get("/api/v1/merchant-rules")).andReturn().getResponse().getContentAsString());
@@ -129,6 +130,26 @@ class MerchantRuleApiTest extends AbstractIntegrationTest {
         assertThat(keptCategory).isEqualTo(String.valueOf(otherId));
         mockMvc.perform(get("/api/v1/merchant-rules"))
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void listReportsTheRowsEachDefaultClaims() throws Exception {
+        long categoryId = insertCategory("Taxes");
+        long otherId = insertCategory("Other");
+        long accountId = jdbcTemplate.queryForObject(
+                "insert into account (name, currency) values ('Personal PLN', 'PLN') returning id",
+                Long.class);
+        long statementId = jdbcTemplate.queryForObject(
+                "insert into bank_statement (account_id, bank, file_hash) values (?, 'PEKAO', 'h-claims') returning id",
+                Long.class, accountId);
+        insertTransaction(statementId, accountId, "Example Merchant", categoryId);
+        insertTransaction(statementId, accountId, "Example Merchant", otherId);
+
+        createRule("Example Merchant", categoryId);
+
+        mockMvc.perform(get("/api/v1/merchant-rules"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].claimedRows").value(1));
     }
 
     @Test

@@ -142,6 +142,8 @@ export interface MerchantRule {
   categoryId: number
   categoryName: string | null
   color: string | null
+  /** Rows this default currently claims; deleting it would revert exactly these. */
+  claimedRows: number
 }
 
 export interface StatisticsTotals {

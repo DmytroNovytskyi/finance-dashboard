@@ -43,6 +43,17 @@ const PAGINATION_HEIGHT = 48
 /** Unstretched height of one default row; the rows share whatever height the card has left. */
 const DEFAULT_ROW_HEIGHT = 52
 
+/** What deleting a default costs, worded for the confirmation so the damage is known beforehand. */
+function claimSentence(claimedRows: number, categoryName: string | undefined): string {
+  if (claimedRows === 0) {
+    return 'It claims no rows right now.'
+  }
+  const filed = `it filed under ${categoryName ?? 'its category'}`
+  return claimedRows === 1
+    ? `One row ${filed} becomes uncategorized.`
+    : `${claimedRows} rows ${filed} become uncategorized.`
+}
+
 /** Lists merchant→category defaults and lets each be applied to matching uncategorized rows. */
 export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
   const scheme = useScheme()
@@ -264,9 +275,9 @@ export function MerchantDefaults({ categories }: MerchantDefaultsProps) {
         <DialogTitle>Delete default</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Delete the default for “{confirmDelete?.merchant}”? Every row it still claims that is filed under{' '}
-            {categoryById.get(confirmDelete?.categoryId ?? -1)?.name ?? 'its category'} becomes uncategorized, and it
-            stops tagging future imports. This cannot be undone.
+            Delete the default for “{confirmDelete?.merchant}”?{' '}
+            {claimSentence(confirmDelete?.claimedRows ?? 0, categoryById.get(confirmDelete?.categoryId ?? -1)?.name)} It
+            stops tagging future imports, and this cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

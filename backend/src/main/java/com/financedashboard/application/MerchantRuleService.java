@@ -29,22 +29,24 @@ public class MerchantRuleService {
     private final CategoryRepository categories;
     private final TransactionRepository transactions;
 
-    /** A rule joined with its category's display fields, for the API. */
+    /** A rule joined with its category's display fields and the rows it currently claims. */
     public record RuleDetail(
             Long id,
             String merchant,
             MatchType matchType,
             Long categoryId,
             String categoryName,
-            String color) {
+            String color,
+            int claimedRows) {
     }
 
     /** Returns all rules with their resolved category fields, in insertion order. */
     public List<RuleDetail> list() {
         Map<Long, Category> categoryById = categories.findAll().stream()
                 .collect(Collectors.toMap(Category::getId, Function.identity()));
+        List<Transaction> tagged = transactions.findCategorized();
         return rules.findAll().stream()
-                .map(rule -> detail(rule, categoryById.get(rule.getCategoryId())))
+                .map(rule -> detail(rule, categoryById.get(rule.getCategoryId()), claims(rule, tagged)))
                 .toList();
     }
 
@@ -71,7 +73,7 @@ public class MerchantRuleService {
                 .matchType(matchType == null ? MatchType.EQUALS : matchType)
                 .categoryId(categoryId)
                 .build());
-        return detail(saved, category);
+        return detail(saved, category, claims(saved, transactions.findCategorized()));
     }
 
     /**
@@ -209,9 +211,21 @@ public class MerchantRuleService {
         return category;
     }
 
-    private static RuleDetail detail(MerchantRule rule, Category category) {
+    /**
+     * How many rows this rule on its own would revert were it deleted: the categorized, non-transfer
+     * transactions whose merchant it matches and whose category is the one it files them under. That
+     * is the test {@link #revertTagged(List)} applies to a single rule, so the damage a client is
+     * shown before deleting a default is the damage the deletion reports back.
+     */
+    private static int claims(MerchantRule rule, List<Transaction> tagged) {
+        List<MerchantRule> alone = List.of(rule);
+        return (int) tagged.stream().filter(transaction -> usesLink(transaction, alone)).count();
+    }
+
+    private static RuleDetail detail(MerchantRule rule, Category category, int claimedRows) {
         return new RuleDetail(rule.getId(), rule.getMerchant(), rule.getMatchType(), rule.getCategoryId(),
                 category == null ? null : category.getName(),
-                category == null ? null : category.getColor());
+                category == null ? null : category.getColor(),
+                claimedRows);
     }
 }
